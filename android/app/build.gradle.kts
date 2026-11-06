@@ -19,7 +19,7 @@ android {
         targetSdk = 22
         // Every CI build gets a higher number, so updates install over the old app.
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-        versionName = "0.3.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
+        versionName = "0.4.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
         ndk { abiFilters += "armeabi-v7a" }
     }
 

@@ -3,6 +3,7 @@
 package com.nandan.cctv
 
 import android.app.ActivityManager
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
@@ -50,6 +51,17 @@ import java.util.Locale
 class CameraService : Service(), Bot.Control {
 
     companion object {
+        /** Intent extra: why the service is being started (shown in the "back online" message). */
+        const val EXTRA_REASON = "reason"
+        /** Intent action used by MainActivity: opening the app reloads the settings. */
+        const val ACTION_OPEN = "com.nandan.cctv.OPEN"
+        private const val ALARM_EVERY_MS = 5 * 60_000L
+
+        /** Starts (or pokes) the service. Safe to call when it's already running. */
+        fun start(ctx: Context, reason: String, action: String? = null) {
+            ctx.startService(Intent(ctx, CameraService::class.java).setAction(action).putExtra(EXTRA_REASON, reason))
+        }
+
         private const val NOTIFICATION_ID = 1
         private const val TEST_JPG_EVERY_MS = 60_000L
         private const val WATCHDOG_EVERY_MS = 10_000L
@@ -85,6 +97,9 @@ class CameraService : Service(), Bot.Control {
     // On/off switches set from Telegram; saved so they survive restarts.
     @Volatile private var recordOn = true
     @Volatile private var alertsOn = true
+    @Volatile private var videosOn = true
+    private var greeted = false
+    private var lastVideoAt = -1L
 
     // Telegram requests and alerts (camera thread).
     private var rotation = 0              // degrees to turn camera images upright
@@ -149,6 +164,7 @@ class CameraService : Service(), Bot.Control {
         prefs().let {
             recordOn = it.getBoolean("record", true)
             alertsOn = it.getBoolean("alerts", true)
+            videosOn = it.getBoolean("videos", true)
         }
 
         // Keep the CPU running while the screen is off.
@@ -166,10 +182,7 @@ class CameraService : Service(), Bot.Control {
 
         bot = Bot(this)
         bot.configure(config)
-        val version = packageManager.getPackageInfo(packageName, 0).versionName
-        bot.send("🟢 CCTV back online (v$version)\n" +
-            "Battery ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
-            "Recording ${onOff(recordOn)}, alerts ${onOff(alertsOn)}")
+        scheduleWatchdogAlarm()
 
         camThread = HandlerThread("camera").apply { start() }
         cam = Handler(camThread.looper)
@@ -182,8 +195,38 @@ class CameraService : Service(), Bot.Control {
     // Called every time someone starts the service, e.g. each time the app is opened.
     // START_STICKY: if Android kills the service for memory, it restarts it later.
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (startId > 1) reload() // opening the app again = reload settings
+        // intent == null means Android re-created the service after killing the app (START_STICKY).
+        val reason = intent?.getStringExtra(EXTRA_REASON) ?: "restarted by Android after the app was killed"
+        if (!greeted) {
+            greeted = true
+            FileLog.i("started: $reason")
+            val version = packageManager.getPackageInfo(packageName, 0).versionName
+            bot.sendWhenOnline("🟢 CCTV back online (v$version)\n" +
+                "Why: $reason\n" +
+                "Battery ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
+                "Recording ${onOff(recordOn)}, alerts ${onOff(alertsOn)}, videos ${onOff(videosOn)}")
+        } else if (intent?.action == ACTION_OPEN) {
+            reload() // opening the app again = reload settings
+        }
+        // Other starts (the 5-minute alarm while we're running) need nothing.
         return START_STICKY
+    }
+
+    /**
+     * Every 5 minutes Android's AlarmManager "starts" this service. If it's running,
+     * that does nothing. If it died, this brings it back. The alarm lives in the
+     * system, not in our app, so it fires even when our process is gone.
+     */
+    private fun scheduleWatchdogAlarm() {
+        val pi = PendingIntent.getService(
+            this, 1,
+            Intent(this, CameraService::class.java).putExtra(EXTRA_REASON, "5-minute check found the service stopped"),
+            PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        (getSystemService(Context.ALARM_SERVICE) as AlarmManager).setRepeating(
+            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+            SystemClock.elapsedRealtime() + ALARM_EVERY_MS, ALARM_EVERY_MS, pi
+        )
     }
 
     override fun onDestroy() {
@@ -366,7 +409,10 @@ class CameraService : Service(), Bot.Control {
             warmUntil = now + config.clipSeconds * 1000L // at most one photo per clip length
             detector.reset()
         } else {
-            startRecording(File(Storage.clipsDir, "$name.mp4"), config.clipSeconds, sendWhenDone = false)
+            // Send the video too (after the photo), with the same cooldown as alerts.
+            val sendVideo = videosOn && (lastVideoAt < 0 || now - lastVideoAt >= cooldownMs)
+            if (sendVideo) lastVideoAt = now
+            startRecording(File(Storage.clipsDir, "$name.mp4"), config.clipSeconds, sendWhenDone = sendVideo)
         }
     }
 
@@ -609,7 +655,7 @@ class CameraService : Service(), Bot.Control {
             "Up: ${duration(SystemClock.elapsedRealtime() - serviceStartedAt)} (phone up ${duration(SystemClock.elapsedRealtime())})\n" +
             "Battery: ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
             "Storage: $count files, $mb MB of ${config.storageCapMB} MB cap, ${Storage.freeMB()} MB free\n" +
-            "Recording: ${onOff(recordOn)}${if (photoOnly) " (photo-only fallback)" else ""}, alerts: ${onOff(alertsOn)}\n" +
+            "Recording: ${onOff(recordOn)}${if (photoOnly) " (photo-only fallback)" else ""}, alerts: ${onOff(alertsOn)}, videos: ${onOff(videosOn)}\n" +
             "RAM free: ${mi.availMem / 1_048_576} MB of ${mi.totalMem / 1_048_576} MB\n" +
             "Wi-Fi: ${wifi.rssi} dBm ($bars/4)\n" +
             "Camera: ${if (camera != null || recorder != null) "${width}x$height" else "NOT RUNNING"}${if (recorder != null) ", recording now" else ""}"
@@ -632,6 +678,28 @@ class CameraService : Service(), Bot.Control {
     override fun status() { cam.post { bot.send(statusText()) } }
     override fun setRecording(on: Boolean) { recordOn = on; prefs().edit().putBoolean("record", on).apply() }
     override fun setAlerts(on: Boolean) { alertsOn = on; prefs().edit().putBoolean("alerts", on).apply() }
+    override fun setVideos(on: Boolean) { videosOn = on; prefs().edit().putBoolean("videos", on).apply() }
+
+    override fun last() {
+        cam.post {
+            val clip = Storage.clipsDir.listFiles()
+                ?.filter { it.isFile && it.name.endsWith(".mp4") && it != recordingFile }
+                ?.maxByOrNull { it.name }
+            if (clip == null) bot.send("No saved clips yet.")
+            else bot.sendVideo(clip, "🎞 Last clip: ${clip.nameWithoutExtension} (${clip.length() / 1024} KB)")
+        }
+    }
+
+    // Testing helpers for Phase 4.
+    override fun testKill() {
+        // Like a crash or Android killing us for memory. Wait 2 s so the reply gets out first.
+        cam.postDelayed({ FileLog.w("testkill: killing own process"); android.os.Process.killProcess(android.os.Process.myPid()) }, 2_000)
+    }
+
+    override fun testStop() {
+        // A clean stop: START_STICKY won't restart this, only the 5-minute alarm will.
+        main.postDelayed({ FileLog.w("teststop: stopping service"); stopSelf() }, 2_000)
+    }
     override fun reload() {
         cam.post {
             config = Config.load(this)

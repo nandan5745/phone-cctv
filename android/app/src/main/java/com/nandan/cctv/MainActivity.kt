@@ -1,7 +1,6 @@
 package com.nandan.cctv
 
 import android.app.Activity
-import android.content.Intent
 import android.os.Bundle
 import android.widget.TextView
 
@@ -9,7 +8,7 @@ import android.widget.TextView
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startService(Intent(this, CameraService::class.java))
+        CameraService.start(this, "app opened by hand", CameraService.ACTION_OPEN)
         val text = TextView(this)
         text.setPadding(40, 40, 40, 40)
         text.textSize = 18f

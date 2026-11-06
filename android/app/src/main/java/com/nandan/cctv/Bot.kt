@@ -25,7 +25,11 @@ class Bot(private val control: Control) {
         fun status()
         fun setRecording(on: Boolean)
         fun setAlerts(on: Boolean)
+        fun setVideos(on: Boolean)
+        fun last()
         fun reload()
+        fun testKill()
+        fun testStop()
     }
 
     companion object {
@@ -38,9 +42,14 @@ class Bot(private val control: Control) {
             "/status – battery, storage, memory, Wi-Fi\n" +
             "/record on|off – record clips on motion\n" +
             "/alerts on|off – photo alerts on motion\n" +
+            "/videos on|off – also send the motion video\n" +
+            "/last – send the most recent saved clip\n" +
             "/log – last 30 log lines\n" +
             "/reload – re-read settings\n" +
-            "/help – this list"
+            "/help – this list\n\n" +
+            "Testing only:\n" +
+            "/testkill – crash the app on purpose (it should come back by itself)\n" +
+            "/teststop – stop the camera service (the 5-minute check should restart it)"
     }
 
     @Volatile private var config: Config? = null
@@ -86,6 +95,10 @@ class Bot(private val control: Control) {
 
     fun send(text: String) = deliver("message") { a, chat -> a.sendMessage(chat, text) }
 
+    /** Keeps retrying until it gets through (e.g. Wi-Fi still connecting after a reboot). */
+    fun sendWhenOnline(text: String) =
+        deliver("message", maxTries = Int.MAX_VALUE) { a, chat -> a.sendMessage(chat, text) }
+
     /** [jpeg] is the raw camera JPEG; it is rotated and time-stamped on the sender thread. */
     fun sendPhoto(jpeg: ByteArray, rotation: Int, label: String, caption: String) =
         deliver("photo") { a, chat -> a.sendPhoto(chat, Photo.upright(jpeg, rotation, label), caption) }
@@ -93,23 +106,26 @@ class Bot(private val control: Control) {
     fun sendVideo(file: File, caption: String) =
         deliver("video") { a, chat -> a.sendVideo(chat, file, caption) }
 
-    private fun deliver(what: String, block: (TelegramApi, Long) -> Unit) {
+    private fun deliver(what: String, maxTries: Int = MAX_SEND_TRIES, block: (TelegramApi, Long) -> Unit) {
         if (api == null || sender.isShutdown) return
         sender.execute {
             var delay = 5_000L
-            for (attempt in 1..MAX_SEND_TRIES) {
+            var attempt = 0
+            while (attempt < maxTries) {
+                attempt++
                 val a = api ?: return@execute
                 val chat = config?.telegramUserId ?: return@execute
                 try {
                     block(a, chat)
                     return@execute
                 } catch (e: Exception) {
-                    FileLog.w("telegram: sending $what failed (try $attempt): ${a.safe(e)}")
+                    // Log the first tries, then only every 10th, so a long outage doesn't flood the log.
+                    if (attempt <= 3 || attempt % 10 == 0) FileLog.w("telegram: sending $what failed (try $attempt): ${a.safe(e)}")
                 }
                 try { Thread.sleep(delay) } catch (e: InterruptedException) { return@execute }
                 delay = (delay * 2).coerceAtMost(60_000L)
             }
-            FileLog.e("telegram: gave up sending $what after $MAX_SEND_TRIES tries")
+            FileLog.e("telegram: gave up sending $what after $maxTries tries")
         }
     }
 
@@ -187,6 +203,11 @@ class Bot(private val control: Control) {
                 ?: send("Usage: /record on   or   /record off")
             "/alerts" -> onOff(arg)?.let { control.setAlerts(it); send("Motion alerts: ${if (it) "ON" else "OFF"}") }
                 ?: send("Usage: /alerts on   or   /alerts off")
+            "/videos" -> onOff(arg)?.let { control.setVideos(it); send("Motion videos: ${if (it) "ON" else "OFF"}") }
+                ?: send("Usage: /videos on   or   /videos off")
+            "/last" -> control.last()
+            "/testkill" -> { send("Killing the app now. Expect a 'back online' message."); control.testKill() }
+            "/teststop" -> { send("Stopping the service. The 5-minute check should restart it."); control.testStop() }
             "/log" -> send(FileLog.tail(30))
             "/reload" -> control.reload()
             else -> send("Unknown command. Send /help")

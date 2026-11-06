@@ -55,6 +55,9 @@ class CameraService : Service(), Bot.Control {
         const val EXTRA_REASON = "reason"
         /** Intent action used by MainActivity: opening the app reloads the settings. */
         const val ACTION_OPEN = "com.nandan.cctv.OPEN"
+        /** True while the service exists in this process (read by BootReceiver). */
+        @Volatile var running = false
+            private set
         // 1 minute: the shortest repeat Android 5 allows. This phone does not restart a
         // crashed service by itself (tested 2026-11-07), so this alarm is the only way back.
         private const val ALARM_EVERY_MS = 60_000L
@@ -159,6 +162,7 @@ class CameraService : Service(), Bot.Control {
     override fun onCreate() {
         super.onCreate()
         FileLog.i("service created")
+        running = true
         startForeground(NOTIFICATION_ID, buildNotification())
         config = Config.load(this)
         Storage.clipsDir.mkdirs()
@@ -185,6 +189,7 @@ class CameraService : Service(), Bot.Control {
         bot = Bot(this)
         bot.configure(config)
         scheduleWatchdogAlarm()
+        startSshdOncePerBoot()
 
         camThread = HandlerThread("camera").apply { start() }
         cam = Handler(camThread.looper)
@@ -233,6 +238,7 @@ class CameraService : Service(), Bot.Control {
 
     override fun onDestroy() {
         FileLog.i("service destroyed")
+        running = false
         cam.removeCallbacksAndMessages(null)
         cam.post { stopRecording(); stopCamera() }
         camThread.quitSafely()
@@ -672,6 +678,19 @@ class CameraService : Service(), Bot.Control {
 
     private fun prefs() = getSharedPreferences("state", Context.MODE_PRIVATE)
 
+    /**
+     * After a reboot nothing starts sshd (Termux:Boot is blocked on this phone), so the
+     * first service start after each boot asks Termux to do it. "Boot time" = now minus
+     * time since boot; it identifies the boot (allowing a minute of clock jitter).
+     */
+    private fun startSshdOncePerBoot() {
+        val bootMin = (System.currentTimeMillis() - SystemClock.elapsedRealtime()) / 60_000
+        val last = prefs().getLong("sshdBootMin", 0)
+        if (Math.abs(bootMin - last) > 1) {
+            if (Termux.startSshd(this, "first start since boot")) prefs().edit().putLong("sshdBootMin", bootMin).apply()
+        }
+    }
+
     // ---------------------------------------------------------------- Telegram commands (Bot.Control)
     // Called on the "tg-poll" thread; the work is posted to the camera thread.
 
@@ -680,6 +699,11 @@ class CameraService : Service(), Bot.Control {
     override fun status() { cam.post { bot.send(statusText()) } }
     override fun setRecording(on: Boolean) { recordOn = on; prefs().edit().putBoolean("record", on).apply() }
     override fun setAlerts(on: Boolean) { alertsOn = on; prefs().edit().putBoolean("alerts", on).apply() }
+    override fun sshd() {
+        val ok = Termux.startSshd(this, "/sshd command")
+        bot.send(if (ok) "Asked Termux to start sshd. Try ssh in ~10 s." else "Could not reach Termux, see /log")
+    }
+
     override fun setVideos(on: Boolean) { videosOn = on; prefs().edit().putBoolean("videos", on).apply() }
 
     override fun last() {

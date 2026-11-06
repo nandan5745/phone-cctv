@@ -27,6 +27,7 @@ class Bot(private val control: Control) {
         fun setAlerts(on: Boolean)
         fun setVideos(on: Boolean)
         fun last()
+        fun sshd()
         fun reload()
         fun testKill()
         fun testStop()
@@ -45,6 +46,7 @@ class Bot(private val control: Control) {
             "/videos on|off – also send the motion video\n" +
             "/last – send the most recent saved clip\n" +
             "/log – last 30 log lines\n" +
+            "/sshd – start SSH on the phone (Termux)\n" +
             "/reload – re-read settings\n" +
             "/help – this list\n\n" +
             "Testing only:\n" +
@@ -206,6 +208,7 @@ class Bot(private val control: Control) {
             "/videos" -> onOff(arg)?.let { control.setVideos(it); send("Motion videos: ${if (it) "ON" else "OFF"}") }
                 ?: send("Usage: /videos on   or   /videos off")
             "/last" -> control.last()
+            "/sshd" -> control.sshd()
             "/testkill" -> { send("Killing the app now. Expect a 'back online' message."); control.testKill() }
             "/teststop" -> { send("Stopping the service. The 1-minute check should restart it."); control.testStop() }
             "/log" -> send(FileLog.tail(30))

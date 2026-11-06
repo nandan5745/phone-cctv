@@ -19,7 +19,10 @@ Plain Kotlin and Android framework APIs only (no AndroidX), built on GitHub Acti
   the newest clip.
 - Phase 4: starts by itself after a reboot and after an app update; a 1-minute alarm restarts
   the service if it died; "back online" (with the reason) is retried until the network is up.
-  sshd starts at boot through Termux:Boot (`~/.termux/boot/start-sshd`).
+  This phone (low-RAM mode) never delivers BOOT_COMPLETED to apps, so the app also wakes on
+  Wi-Fi/network/charger/unlock events. On its first start after each boot it asks Termux
+  (RUN_COMMAND, needs `allow-external-apps = true`) to run `~/.termux/boot/start-sshd`;
+  `/sshd` does the same on demand.
 
 ## Settings
 

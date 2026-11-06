@@ -25,7 +25,7 @@ app (you'd have to uninstall first).
 ```sh
 scripts/deploy.sh   # downloads the latest APK, copies it over SSH, opens the installer
 ```
-Then tap **Install** on the phone, and open the **CCTV** app once to start the service.
+Unlock the phone when the script asks (the installer only shows on an unlocked phone), then tap **Install**, and open the **CCTV** app once to start the service.
 
 ## Debug
 

@@ -11,6 +11,11 @@ echo "Downloading APK from run $RUN_ID"
 gh run download "$RUN_ID" --name cctv-apk --dir .deploy
 
 scp .deploy/cctv.apk phone:/sdcard/Download/cctv.apk
+
+# The installer screen only appears while the phone is unlocked.
+printf 'Unlock the phone, then press Enter to open the installer... '
+read _
+
 ssh phone 'am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d file:///sdcard/Download/cctv.apk \
   || termux-open /sdcard/Download/cctv.apk'
 echo "Now tap Install on the phone."

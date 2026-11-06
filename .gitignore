@@ -1,0 +1,20 @@
+# Signing keys and secrets: never commit
+*.jks
+*.keystore
+*.p12
+*.b64
+keystore-password*.txt
+config.json
+
+# Build output
+.gradle/
+build/
+*.apk
+local.properties
+
+# Local files
+.DS_Store
+.idea/
+*.iml
+.deploy/
+phone-cctv-plan-*.md

@@ -8,6 +8,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.graphics.ImageFormat
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -114,6 +116,7 @@ class CameraService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         config = Config.load(this)
         Storage.clipsDir.mkdirs()
+        Storage.deleteBrokenClips()
 
         // Keep the CPU running while the screen is off.
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -374,28 +377,23 @@ class CameraService : Service() {
         }
     }
 
-    /** Take the camera back from MediaRecorder and restart motion detection. */
+    /**
+     * Take the camera back from MediaRecorder and restart motion detection.
+     *
+     * On the LYF Flame, reconnect() + startPreview() on the same SurfaceTexture hangs ~6 s
+     * and then fails (log of 2026-11-06), while closing and reopening the camera takes
+     * ~0.3 s. So we always reopen.
+     */
     private fun resumeAfterRecording() {
-        val c = camera ?: return startCamera()
-        try {
-            c.reconnect()
-            val s = c.parameters.previewSize
-            if (s.width != width || s.height != height) {
-                throw IllegalStateException("preview size changed to ${s.width}x${s.height}")
-            }
-            attachFrameCallback(c)
-            c.startPreview()
-        } catch (e: Exception) {
-            FileLog.w("camera reconnect failed, reopening camera", e)
-            stopCamera()
-            startCamera()
-            return
+        camera?.let {
+            try { it.reconnect() } catch (e: Exception) { FileLog.w("camera reconnect failed: ${e.message}") }
         }
-        val now = SystemClock.elapsedRealtime()
-        lastFrameAt = now
-        warmUntil = now + WARMUP_AFTER_CLIP_MS
-        motionStreak = 0
-        detector.reset()
+        stopCamera()
+        startCamera()
+        if (camera != null) {
+            // Exposure is already settled after a clip, so a short warm-up is enough.
+            warmUntil = SystemClock.elapsedRealtime() + WARMUP_AFTER_CLIP_MS
+        }
     }
 
     /** NV21 → JPEG, written to a temp file and renamed so readers never see half a file. */
@@ -453,6 +451,7 @@ class CameraService : Service() {
                 ", heap ${(rt.totalMemory() - rt.freeMemory()) / 1_048_576}/${rt.maxMemory() / 1_048_576} MB" +
                 " | analysed $statAnalyzed, max change ${"%.1f".format(statMaxShare * 100)}%" +
                 ", motions $statMotions, clips $statClips | files $count ($mb MB), disk free ${Storage.freeMB()} MB" +
+                " | " + batteryText() +
                 (if (photoOnly) " | PHOTO-ONLY" else ""))
             statAnalyzed = 0; statMaxShare = 0f; statMotions = 0; statClips = 0
             cam.postDelayed(this, STATUS_LOG_EVERY_MS)
@@ -520,6 +519,32 @@ class CameraService : Service() {
         sizes.filter { it.width <= WANT_W && it.height <= WANT_H }
             .maxByOrNull { it.width * it.height }?.let { return it }
         return sizes.minByOrNull { it.width * it.height }!!
+    }
+
+    /**
+     * Battery level, charging state and temperature. ACTION_BATTERY_CHANGED is a
+     * "sticky" broadcast: registering with a null receiver just returns the latest value.
+     */
+    private fun batteryText(): String {
+        val b = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return "battery ?"
+        val level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        val pct = if (level >= 0 && scale > 0) level * 100 / scale else -1
+        val state = when (b.getIntExtra(BatteryManager.EXTRA_STATUS, -1)) {
+            BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
+            BatteryManager.BATTERY_STATUS_FULL -> "full"
+            BatteryManager.BATTERY_STATUS_DISCHARGING -> "DISCHARGING"
+            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "NOT CHARGING"
+            else -> "unknown"
+        }
+        val plug = when (b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)) {
+            BatteryManager.BATTERY_PLUGGED_AC -> " (AC)"
+            BatteryManager.BATTERY_PLUGGED_USB -> " (USB)"
+            0 -> " (unplugged)"
+            else -> ""
+        }
+        val tempC = b.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -10) / 10.0
+        return "battery $pct% $state$plug ${"%.1f".format(tempC)}°C"
     }
 
     private fun isScreenOn(): Boolean =

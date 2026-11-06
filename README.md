@@ -8,7 +8,8 @@ Plain Kotlin and Android framework APIs only (no AndroidX), built on GitHub Acti
 - Phase 1 (done): foreground service keeps the back camera running with the screen off.
 - Phase 2: motion detection, a 20 s clip per motion event in `/sdcard/cctv/clips/`
   (`YYYY-MM-DD_HH-MM-SS.mp4` plus a `.jpg` of the moment motion was seen), and a size cap
-  (oldest deleted first). `/sdcard/cctv/test.jpg` is refreshed every 60 s to check the view.
+  (oldest deleted first). Clips cut off by a crash or power loss are deleted at startup.
+  `/sdcard/cctv/test.jpg` is refreshed every 60 s to check the view.
 
 ## Settings
 
@@ -29,7 +30,7 @@ Missing keys use these defaults:
 ```
 
 Every 10 minutes the log prints a `status:` line with the biggest change seen
-(`max change`). In an empty room that number should stay well below `motionThreshold`.
+(`max change`), plus battery %, charging state and temperature. In an empty room that number should stay well below `motionThreshold`.
 
 ## Build
 

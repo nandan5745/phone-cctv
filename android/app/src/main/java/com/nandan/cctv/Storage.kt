@@ -2,6 +2,7 @@ package com.nandan.cctv
 
 import android.os.StatFs
 import java.io.File
+import java.io.RandomAccessFile
 
 /** Clip folder housekeeping: size cap (oldest deleted first) and free-space check. */
 object Storage {
@@ -18,6 +19,52 @@ object Storage {
     fun stats(): Pair<Int, Long> {
         val files = clips()
         return files.size to files.sumOf { it.length() } / MB
+    }
+
+    /**
+     * Run at startup: removes leftovers of a crash or power loss while recording.
+     * - 0-byte files and half-written ".tmp" files
+     * - .mp4 files that aren't complete. An MP4 is a chain of boxes (size + type).
+     *   This phone's MediaRecorder reserves the "moov" index box at the start and fills
+     *   in the box sizes when recording stops. A clip cut off mid-way has an "mdat"
+     *   (video data) box whose size is 0 or bigger than what is on disk.
+     * The .jpg taken when motion started is kept: it's still a valid photo.
+     */
+    fun deleteBrokenClips() {
+        val files = clipsDir.listFiles() ?: return
+        var deleted = 0
+        for (f in files) {
+            if (!f.isFile) continue
+            val broken = f.length() == 0L || f.name.endsWith(".tmp") ||
+                (f.name.endsWith(".mp4") && !isCompleteMp4(f))
+            if (broken) {
+                FileLog.w("deleting broken file ${f.name} (${f.length() / 1024} KB)")
+                if (f.delete()) deleted++
+            }
+        }
+        if (deleted > 0) FileLog.i("startup cleanup: deleted $deleted broken files")
+    }
+
+    /** True if the file has a "moov" box and its top-level boxes add up exactly to its size. */
+    private fun isCompleteMp4(f: File): Boolean = try {
+        RandomAccessFile(f, "r").use { raf ->
+            val len = raf.length()
+            var pos = 0L
+            var found = false
+            while (pos + 8 <= len) {
+                raf.seek(pos)
+                var size = raf.readInt().toLong() and 0xFFFFFFFFL
+                val type = ByteArray(4).also { raf.readFully(it) }.toString(Charsets.US_ASCII)
+                if (type == "moov") found = true
+                if (size == 1L) size = raf.readLong()       // 64-bit size follows
+                else if (size == 0L) break                   // size not written yet: incomplete
+                if (size < 8) break                          // corrupt
+                pos += size
+            }
+            found && pos == len
+        }
+    } catch (e: Exception) {
+        false
     }
 
     /** Deletes the oldest files until the folder is under capMB. */

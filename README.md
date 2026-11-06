@@ -5,8 +5,31 @@ Plain Kotlin and Android framework APIs only (no AndroidX), built on GitHub Acti
 
 ## Status
 
-Phase 1: foreground service keeps the back camera running (screen on or off) and
-saves `/sdcard/cctv/test.jpg` every 10 seconds. Logs go to `/sdcard/cctv/log.txt`.
+- Phase 1 (done): foreground service keeps the back camera running with the screen off.
+- Phase 2: motion detection, a 20 s clip per motion event in `/sdcard/cctv/clips/`
+  (`YYYY-MM-DD_HH-MM-SS.mp4` plus a `.jpg` of the moment motion was seen), and a size cap
+  (oldest deleted first). `/sdcard/cctv/test.jpg` is refreshed every 60 s to check the view.
+
+## Settings
+
+Optional. Put `/sdcard/cctv/config.json` on the phone, unlock it and open the CCTV app (that
+reloads settings). The app moves the file into its private storage and deletes the `/sdcard` copy.
+Missing keys use these defaults:
+
+```json
+{
+  "motionPixelDiff": 25,
+  "motionThreshold": 0.02,
+  "motionFrames": 2,
+  "analyzeFps": 2,
+  "clipSeconds": 20,
+  "storageCapMB": 1200,
+  "minFreeMB": 300
+}
+```
+
+Every 10 minutes the log prints a `status:` line with the biggest change seen
+(`max change`). In an empty room that number should stay well below `motionThreshold`.
 
 ## Build
 

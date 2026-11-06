@@ -13,8 +13,8 @@ class MainActivity : Activity() {
         val text = TextView(this)
         text.setPadding(40, 40, 40, 40)
         text.textSize = 18f
-        text.text = "CCTV service started.\n\nYou can turn the screen off.\n\n" +
-            "Log: /sdcard/cctv/log.txt\nTest image: /sdcard/cctv/test.jpg"
+        text.text = "CCTV is watching for motion.\n\nYou can turn the screen off.\n\n" +
+            "Clips: /sdcard/cctv/clips/\nLog: /sdcard/cctv/log.txt\nTest image (every 60 s): /sdcard/cctv/test.jpg"
         setContentView(text)
     }
 }

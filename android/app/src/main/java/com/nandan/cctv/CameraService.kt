@@ -14,6 +14,7 @@ import android.graphics.Rect
 import android.graphics.SurfaceTexture
 import android.graphics.YuvImage
 import android.hardware.Camera
+import android.media.MediaRecorder
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
@@ -21,52 +22,87 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.view.Gravity
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.WindowManager
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
- * Phase 1: a foreground service that keeps the back camera running (also with the
- * screen off) and saves the current frame to /sdcard/cctv/test.jpg every 10 seconds.
+ * Foreground service that keeps the back camera running (also with the screen off),
+ * watches for motion, and records a short clip when something moves.
  *
  * Threads, in JS terms: Android has no single event loop for everything. The "main"
  * thread runs UI work. We start our own "camera" thread with its own event loop
- * (HandlerThread + Handler ≈ a private setTimeout queue). Every camera call and every
- * camera callback happens on that thread, so the camera state needs no locking.
+ * (HandlerThread + Handler ≈ a private setTimeout queue). Every camera call, camera
+ * callback and MediaRecorder callback happens on that thread, so no locking is needed.
+ *
+ * Recording with the old Camera API: the camera can only be used by one owner at a
+ * time. To record we stop our frame callback, camera.unlock() hands it to MediaRecorder,
+ * and after the clip camera.reconnect() takes it back and motion detection resumes.
  */
 class CameraService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 1
-        private const val SAVE_EVERY_MS = 10_000L
+        private const val TEST_JPG_EVERY_MS = 60_000L
         private const val WATCHDOG_EVERY_MS = 10_000L
         private const val NO_FRAMES_LIMIT_MS = 15_000L
-        private const val MEMORY_LOG_EVERY_MS = 10 * 60_000L
+        private const val STATUS_LOG_EVERY_MS = 10 * 60_000L
+        private const val WARMUP_AFTER_START_MS = 5_000L   // auto-exposure settling
+        private const val WARMUP_AFTER_CLIP_MS = 1_500L
+        private const val MAX_RECORD_FAILURES = 3
         private const val WANT_W = 640
         private const val WANT_H = 480
+        private const val VIDEO_BITRATE = 700_000
+        private const val VIDEO_FPS = 15
     }
 
     private val main = Handler(Looper.getMainLooper())
     private lateinit var camThread: HandlerThread
     private lateinit var cam: Handler
     private var wakeLock: PowerManager.WakeLock? = null
+    private lateinit var config: Config
+    private val detector = MotionDetector()
+    private val fileTime = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US)
 
     // Camera state: only touched on the camera thread.
     private var camera: Camera? = null
     private var texture: SurfaceTexture? = null
+    private var textureSurface: Surface? = null
+    private var buffers: Array<ByteArray>? = null
+    private var callbackEpoch = 0 // bumps each time buffers are (re)attached
     private var width = 0
     private var height = 0
     private var startedAt = 0L
     private var lastFrameAt = 0L
-    private var lastSavedAt = 0L
+    private var lastTestJpgAt = 0L
+    private var lastAnalyzedAt = 0L
+    private var warmUntil = 0L
+    private var motionStreak = 0
     private var frames = 0L
-    private var saves = 0L
     private var loggedCapabilities = false
 
+    // Recording state (camera thread).
+    private var recorder: MediaRecorder? = null
+    private var recordingFile: File? = null
+    private var recordStartedAt = 0L
+    private var recordFailures = 0
+    private var photoOnly = false        // fallback if MediaRecorder keeps failing
+    private var lastLowSpaceLogAt = 0L
+
+    // Numbers for the 10-minute status line (helps tune thresholds).
+    private var statAnalyzed = 0
+    private var statMaxShare = 0f
+    private var statMotions = 0
+    private var statClips = 0
+
     // Fallback: a 1x1 pixel window, used only if the phone gives no frames to an
-    // off-screen SurfaceTexture.
+    // off-screen SurfaceTexture. (Not needed on the LYF Flame so far.)
     @Volatile private var useOverlay = false
     @Volatile private var overlay: SurfaceView? = null
 
@@ -76,6 +112,8 @@ class CameraService : Service() {
         super.onCreate()
         FileLog.i("service created")
         startForeground(NOTIFICATION_ID, buildNotification())
+        config = Config.load(this)
+        Storage.clipsDir.mkdirs()
 
         // Keep the CPU running while the screen is off.
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -88,16 +126,20 @@ class CameraService : Service() {
         cam = Handler(camThread.looper)
         cam.post { startCamera() }
         cam.postDelayed(watchdog, WATCHDOG_EVERY_MS)
-        cam.post(memoryLogger)
+        cam.post(statusLogger)
     }
 
+    // Called every time someone starts the service, e.g. each time the app is opened.
     // START_STICKY: if Android kills the service for memory, it restarts it later.
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (startId > 1) cam.post { config = Config.load(this) } // opening the app again = reload settings
+        return START_STICKY
+    }
 
     override fun onDestroy() {
         FileLog.i("service destroyed")
         cam.removeCallbacksAndMessages(null)
-        cam.post { stopCamera() }
+        cam.post { stopRecording(); stopCamera() }
         camThread.quitSafely()
         main.post { removeOverlay() }
         wakeLock?.release()
@@ -122,9 +164,6 @@ class CameraService : Service() {
                 loggedCapabilities = true
                 FileLog.i("cameras=${Camera.getNumberOfCameras()} using id=$id")
                 FileLog.i("preview sizes: " + p.supportedPreviewSizes.joinToString { "${it.width}x${it.height}" })
-                FileLog.i("video sizes: " + (p.supportedVideoSizes?.joinToString { "${it.width}x${it.height}" } ?: "same as preview"))
-                FileLog.i("preview formats: ${p.supportedPreviewFormats}  fps ranges: " +
-                    p.supportedPreviewFpsRange.joinToString { "${it[0] / 1000}-${it[1] / 1000}" })
                 FileLog.i("focus modes: ${p.supportedFocusModes}")
             }
             val size = choosePreviewSize(p.supportedPreviewSizes)
@@ -143,25 +182,35 @@ class CameraService : Service() {
                 // An off-screen texture: the camera needs *some* surface to draw into.
                 val t = SurfaceTexture(10)
                 texture = t
+                textureSurface = Surface(t)
                 c.setPreviewTexture(t)
             }
 
-            // Two reused byte buffers, so we don't create garbage on every frame.
-            val bufSize = width * height * ImageFormat.getBitsPerPixel(ImageFormat.NV21) / 8
-            repeat(2) { c.addCallbackBuffer(ByteArray(bufSize)) }
-            c.setPreviewCallbackWithBuffer(frameCallback)
             c.setErrorCallback { error, _ ->
                 FileLog.e("camera error callback: $error, restarting camera")
-                cam.post { stopCamera(); startCamera() }
+                cam.post { stopRecording(); stopCamera(); startCamera() }
             }
+            attachFrameCallback(c)
             c.startPreview()
             startedAt = SystemClock.elapsedRealtime()
             lastFrameAt = 0L
+            warmUntil = startedAt + WARMUP_AFTER_START_MS
+            detector.reset()
             FileLog.i("camera started ${width}x$height, surface=${if (useOverlay) "1px overlay" else "SurfaceTexture"}")
         } catch (e: Exception) {
             FileLog.e("camera start failed", e)
             stopCamera()
         }
+    }
+
+    /** Two reused byte buffers, so we don't create garbage on every frame. */
+    private fun attachFrameCallback(c: Camera) {
+        val bufSize = width * height * ImageFormat.getBitsPerPixel(ImageFormat.NV21) / 8
+        val b = buffers?.takeIf { it[0].size == bufSize }
+            ?: Array(2) { ByteArray(bufSize) }.also { buffers = it }
+        b.forEach { c.addCallbackBuffer(it) }
+        callbackEpoch++
+        c.setPreviewCallbackWithBuffer(frameCallback)
     }
 
     private fun stopCamera() {
@@ -174,40 +223,192 @@ class CameraService : Service() {
             FileLog.w("stopPreview failed", e)
         }
         c.release()
+        textureSurface?.release()
+        textureSurface = null
         texture?.release()
         texture = null
         FileLog.i("camera stopped")
     }
 
     private val frameCallback = Camera.PreviewCallback { data, c ->
-        if (data == null) return@PreviewCallback
+        if (data == null || recorder != null) return@PreviewCallback
         val now = SystemClock.elapsedRealtime()
         if (frames == 0L) FileLog.i("first frame received")
         frames++
         lastFrameAt = now
-        if (now - lastSavedAt >= SAVE_EVERY_MS) {
-            lastSavedAt = now
-            saveJpeg(data)
+
+        if (now - lastTestJpgAt >= TEST_JPG_EVERY_MS) {
+            lastTestJpgAt = now
+            saveJpeg(data, File(FileLog.dir, "test.jpg"))
+        }
+
+        // Only analyse ~analyzeFps frames per second; skip the rest.
+        if (now >= warmUntil && now - lastAnalyzedAt >= 1000L / config.analyzeFps) {
+            lastAnalyzedAt = now
+            val share = detector.changedShare(data, width, height, config.motionPixelDiff)
+            if (share >= 0f) {
+                statAnalyzed++
+                if (share > statMaxShare) statMaxShare = share
+                motionStreak = if (share >= config.motionThreshold) motionStreak + 1 else 0
+                if (motionStreak >= config.motionFrames) {
+                    motionStreak = 0
+                    val epoch = callbackEpoch
+                    onMotion(data, share) // may hand the camera to MediaRecorder
+                    // If buffers were re-attached (recording started, or failed and resumed),
+                    // this buffer is already queued again: don't add it twice.
+                    if (recorder != null || epoch != callbackEpoch) return@PreviewCallback
+                }
+            }
         }
         c.addCallbackBuffer(data) // give the buffer back for the next frame
     }
 
-    /** NV21 → JPEG, written to a temp file and renamed so readers never see half a file. */
-    private fun saveJpeg(nv21: ByteArray) {
+    // ---------------------------------------------------------------- motion + recording
+
+    private fun onMotion(frame: ByteArray, share: Float) {
+        statMotions++
+        val now = SystemClock.elapsedRealtime()
+        val name = fileTime.format(Date())
+        FileLog.i("motion: ${"%.1f".format(share * 100)}% changed -> $name")
+
+        Storage.enforceCap(config.storageCapMB)
+        val free = Storage.freeMB()
+        if (free < config.minFreeMB) {
+            if (now - lastLowSpaceLogAt > 10 * 60_000L) {
+                lastLowSpaceLogAt = now
+                FileLog.w("only $free MB free (< ${config.minFreeMB}), not recording")
+            }
+            return
+        }
+
+        // Still photo of the moment motion was seen (Phase 3 sends this as the alert).
+        saveJpeg(frame, File(Storage.clipsDir, "$name.jpg"))
+
+        if (photoOnly) {
+            warmUntil = now + config.clipSeconds * 1000L // at most one photo per clip length
+            detector.reset()
+        } else {
+            startRecording(File(Storage.clipsDir, "$name.mp4"))
+        }
+    }
+
+    private fun startRecording(file: File) {
+        val c = camera ?: return
+        val r = MediaRecorder()
         try {
-            val dir = FileLog.dir.apply { mkdirs() }
-            val tmp = File(dir, "test.jpg.tmp")
+            c.setPreviewCallbackWithBuffer(null) // stop our frames; MediaRecorder needs the camera
+            c.unlock()
+            r.setCamera(c)
+            r.setVideoSource(MediaRecorder.VideoSource.CAMERA)
+            r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            r.setVideoFrameRate(VIDEO_FPS)
+            r.setVideoSize(width, height)
+            r.setVideoEncodingBitRate(VIDEO_BITRATE)
+            r.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+            r.setOutputFile(file.path)
+            r.setPreviewDisplay(if (useOverlay) overlay?.holder?.surface else textureSurface)
+            r.setMaxDuration(config.clipSeconds * 1000)
+            r.setOnInfoListener { _, what, _ ->
+                if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) cam.post { stopRecording() }
+            }
+            r.setOnErrorListener { _, what, extra ->
+                FileLog.e("MediaRecorder error what=$what extra=$extra")
+                cam.post { stopRecording(failed = true) }
+            }
+            r.prepare()
+            r.start()
+            recorder = r
+            recordingFile = file
+            recordStartedAt = SystemClock.elapsedRealtime()
+            // Backup in case the max-duration event never comes.
+            cam.postDelayed(recordTimeout, config.clipSeconds * 1000L + 5_000L)
+        } catch (e: Exception) {
+            FileLog.e("recording start failed", e)
+            try { r.release() } catch (ignored: Exception) {}
+            file.delete()
+            noteRecordFailure()
+            resumeAfterRecording()
+        }
+    }
+
+    private val recordTimeout = Runnable {
+        FileLog.w("clip did not end by itself, stopping it")
+        stopRecording()
+    }
+
+    private fun stopRecording(failed: Boolean = false) {
+        val r = recorder ?: return
+        recorder = null
+        cam.removeCallbacks(recordTimeout)
+        var ok = !failed
+        try {
+            r.stop()
+        } catch (e: RuntimeException) {
+            ok = false // stop() throws if no video was written
+            FileLog.e("MediaRecorder.stop failed: ${e.message}")
+        }
+        try { r.reset(); r.release() } catch (ignored: Exception) {}
+
+        val f = recordingFile
+        recordingFile = null
+        val secs = (SystemClock.elapsedRealtime() - recordStartedAt) / 1000
+        if (f != null) {
+            if (ok && f.length() > 10_000) {
+                recordFailures = 0
+                statClips++
+                FileLog.i("clip saved ${f.name} ${f.length() / 1024} KB ${secs}s")
+            } else {
+                f.delete()
+                noteRecordFailure()
+            }
+        }
+        resumeAfterRecording()
+        Storage.enforceCap(config.storageCapMB)
+    }
+
+    private fun noteRecordFailure() {
+        recordFailures++
+        if (recordFailures >= MAX_RECORD_FAILURES && !photoOnly) {
+            photoOnly = true
+            FileLog.e("recording failed $recordFailures times in a row: switching to photo-only mode")
+        }
+    }
+
+    /** Take the camera back from MediaRecorder and restart motion detection. */
+    private fun resumeAfterRecording() {
+        val c = camera ?: return startCamera()
+        try {
+            c.reconnect()
+            val s = c.parameters.previewSize
+            if (s.width != width || s.height != height) {
+                throw IllegalStateException("preview size changed to ${s.width}x${s.height}")
+            }
+            attachFrameCallback(c)
+            c.startPreview()
+        } catch (e: Exception) {
+            FileLog.w("camera reconnect failed, reopening camera", e)
+            stopCamera()
+            startCamera()
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        lastFrameAt = now
+        warmUntil = now + WARMUP_AFTER_CLIP_MS
+        motionStreak = 0
+        detector.reset()
+    }
+
+    /** NV21 → JPEG, written to a temp file and renamed so readers never see half a file. */
+    private fun saveJpeg(nv21: ByteArray, target: File) {
+        try {
+            val tmp = File(target.parentFile, target.name + ".tmp")
             FileOutputStream(tmp).use {
                 YuvImage(nv21, ImageFormat.NV21, width, height, null)
                     .compressToJpeg(Rect(0, 0, width, height), 70, it)
             }
-            if (!tmp.renameTo(File(dir, "test.jpg"))) FileLog.w("rename test.jpg failed")
-            saves++
-            if (saves == 1L || saves % 30 == 0L) {
-                FileLog.i("saved test.jpg #$saves, frames so far=$frames, screenOn=${isScreenOn()}")
-            }
+            if (!tmp.renameTo(target)) FileLog.w("rename ${target.name} failed")
         } catch (e: Exception) {
-            FileLog.e("saving test.jpg failed", e)
+            FileLog.e("saving ${target.name} failed", e)
         }
     }
 
@@ -216,7 +417,9 @@ class CameraService : Service() {
         override fun run() {
             try {
                 val now = SystemClock.elapsedRealtime()
-                if (camera == null) {
+                if (recorder != null) {
+                    // No frames while recording is normal.
+                } else if (camera == null) {
                     startCamera()
                 } else {
                     val since = if (lastFrameAt == 0L) startedAt else lastFrameAt
@@ -239,15 +442,20 @@ class CameraService : Service() {
         }
     }
 
-    private val memoryLogger = object : Runnable {
+    private val statusLogger = object : Runnable {
         override fun run() {
             val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             val mi = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
             val rt = Runtime.getRuntime()
-            FileLog.i("memory: system free ${mi.availMem / 1_048_576} MB of ${mi.totalMem / 1_048_576} MB" +
+            val (count, mb) = Storage.stats()
+            FileLog.i("status: ram free ${mi.availMem / 1_048_576}/${mi.totalMem / 1_048_576} MB" +
                 (if (mi.lowMemory) " (LOW)" else "") +
-                ", app heap ${(rt.totalMemory() - rt.freeMemory()) / 1_048_576} MB of max ${rt.maxMemory() / 1_048_576} MB")
-            cam.postDelayed(this, MEMORY_LOG_EVERY_MS)
+                ", heap ${(rt.totalMemory() - rt.freeMemory()) / 1_048_576}/${rt.maxMemory() / 1_048_576} MB" +
+                " | analysed $statAnalyzed, max change ${"%.1f".format(statMaxShare * 100)}%" +
+                ", motions $statMotions, clips $statClips | files $count ($mb MB), disk free ${Storage.freeMB()} MB" +
+                (if (photoOnly) " | PHOTO-ONLY" else ""))
+            statAnalyzed = 0; statMaxShare = 0f; statMotions = 0; statClips = 0
+            cam.postDelayed(this, STATUS_LOG_EVERY_MS)
         }
     }
 
@@ -265,7 +473,7 @@ class CameraService : Service() {
                 override fun surfaceChanged(h: SurfaceHolder, format: Int, w: Int, hh: Int) {}
                 override fun surfaceDestroyed(h: SurfaceHolder) {
                     FileLog.w("overlay surface destroyed")
-                    cam.post { stopCamera() }
+                    cam.post { stopRecording(); stopCamera() }
                 }
             })
             val lp = WindowManager.LayoutParams(
@@ -321,7 +529,7 @@ class CameraService : Service() {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), 0)
         return Notification.Builder(this)
             .setContentTitle("CCTV running")
-            .setContentText("Camera is active")
+            .setContentText("Watching for motion")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentIntent(open)
             .setOngoing(true)

@@ -17,7 +17,7 @@ Plain Kotlin and Android framework APIs only (no AndroidX), built on GitHub Acti
   Only `telegramUserId` gets answers. Battery is logged every minute.
   `/videos on|off` also sends the motion clip after the photo (same cooldown); `/last` sends
   the newest clip.
-- Phase 4: starts by itself after a reboot and after an app update; a 5-minute alarm restarts
+- Phase 4: starts by itself after a reboot and after an app update; a 1-minute alarm restarts
   the service if it died; "back online" (with the reason) is retried until the network is up.
   sshd starts at boot through Termux:Boot (`~/.termux/boot/start-sshd`).
 

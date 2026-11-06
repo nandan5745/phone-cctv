@@ -49,7 +49,7 @@ class Bot(private val control: Control) {
             "/help – this list\n\n" +
             "Testing only:\n" +
             "/testkill – crash the app on purpose (it should come back by itself)\n" +
-            "/teststop – stop the camera service (the 5-minute check should restart it)"
+            "/teststop – stop the camera service (the 1-minute check should restart it)"
     }
 
     @Volatile private var config: Config? = null
@@ -207,7 +207,7 @@ class Bot(private val control: Control) {
                 ?: send("Usage: /videos on   or   /videos off")
             "/last" -> control.last()
             "/testkill" -> { send("Killing the app now. Expect a 'back online' message."); control.testKill() }
-            "/teststop" -> { send("Stopping the service. The 5-minute check should restart it."); control.testStop() }
+            "/teststop" -> { send("Stopping the service. The 1-minute check should restart it."); control.testStop() }
             "/log" -> send(FileLog.tail(30))
             "/reload" -> control.reload()
             else -> send("Unknown command. Send /help")

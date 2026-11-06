@@ -55,7 +55,9 @@ class CameraService : Service(), Bot.Control {
         const val EXTRA_REASON = "reason"
         /** Intent action used by MainActivity: opening the app reloads the settings. */
         const val ACTION_OPEN = "com.nandan.cctv.OPEN"
-        private const val ALARM_EVERY_MS = 5 * 60_000L
+        // 1 minute: the shortest repeat Android 5 allows. This phone does not restart a
+        // crashed service by itself (tested 2026-11-07), so this alarm is the only way back.
+        private const val ALARM_EVERY_MS = 60_000L
 
         /** Starts (or pokes) the service. Safe to call when it's already running. */
         fun start(ctx: Context, reason: String, action: String? = null) {
@@ -208,19 +210,19 @@ class CameraService : Service(), Bot.Control {
         } else if (intent?.action == ACTION_OPEN) {
             reload() // opening the app again = reload settings
         }
-        // Other starts (the 5-minute alarm while we're running) need nothing.
+        // Other starts (the 1-minute alarm while we're running) need nothing.
         return START_STICKY
     }
 
     /**
-     * Every 5 minutes Android's AlarmManager "starts" this service. If it's running,
+     * Every minute Android's AlarmManager "starts" this service. If it's running,
      * that does nothing. If it died, this brings it back. The alarm lives in the
      * system, not in our app, so it fires even when our process is gone.
      */
     private fun scheduleWatchdogAlarm() {
         val pi = PendingIntent.getService(
             this, 1,
-            Intent(this, CameraService::class.java).putExtra(EXTRA_REASON, "5-minute check found the service stopped"),
+            Intent(this, CameraService::class.java).putExtra(EXTRA_REASON, "1-minute check found the service stopped"),
             PendingIntent.FLAG_UPDATE_CURRENT
         )
         (getSystemService(Context.ALARM_SERVICE) as AlarmManager).setRepeating(
@@ -697,7 +699,7 @@ class CameraService : Service(), Bot.Control {
     }
 
     override fun testStop() {
-        // A clean stop: START_STICKY won't restart this, only the 5-minute alarm will.
+        // A clean stop: START_STICKY won't restart this, only the 1-minute alarm will.
         main.postDelayed({ FileLog.w("teststop: stopping service"); stopSelf() }, 2_000)
     }
     override fun reload() {

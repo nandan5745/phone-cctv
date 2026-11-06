@@ -8,8 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.os.BatteryManager
+import android.net.wifi.WifiManager
 import android.graphics.ImageFormat
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -28,6 +27,7 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.WindowManager
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -47,7 +47,7 @@ import java.util.Locale
  * time. To record we stop our frame callback, camera.unlock() hands it to MediaRecorder,
  * and after the clip camera.reconnect() takes it back and motion detection resumes.
  */
-class CameraService : Service() {
+class CameraService : Service(), Bot.Control {
 
     companion object {
         private const val NOTIFICATION_ID = 1
@@ -55,6 +55,9 @@ class CameraService : Service() {
         private const val WATCHDOG_EVERY_MS = 10_000L
         private const val NO_FRAMES_LIMIT_MS = 15_000L
         private const val STATUS_LOG_EVERY_MS = 10 * 60_000L
+        private const val BATTERY_EVERY_MS = 60_000L
+        private const val LOW_BATTERY_PCT = 30
+        private const val MAX_CLIP_S = 30
         private const val WARMUP_AFTER_START_MS = 5_000L   // auto-exposure settling
         private const val WARMUP_AFTER_CLIP_MS = 1_500L
         private const val MAX_RECORD_FAILURES = 3
@@ -71,6 +74,28 @@ class CameraService : Service() {
     private lateinit var config: Config
     private val detector = MotionDetector()
     private val fileTime = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US)
+    private val labelTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+    private lateinit var bot: Bot
+    private var wifiLock: WifiManager.WifiLock? = null
+    private val serviceStartedAt = SystemClock.elapsedRealtime()
+
+    // On/off switches set from Telegram; saved so they survive restarts.
+    @Volatile private var recordOn = true
+    @Volatile private var alertsOn = true
+
+    // Telegram requests and alerts (camera thread).
+    private var rotation = 0              // degrees to turn camera images upright
+    private var snapshotWanted = false
+    private var clipWantedSeconds = 0     // > 0: a /clip is waiting to start
+    private var sendClipWhenDone = false
+    private var lastAlertAt = -1L
+
+    // Battery watcher state (camera thread).
+    private var lowBatteryWarned = false
+    private var wasCharging: Boolean? = null
+    private var chargeRefPct = -1         // highest % seen while plugged in...
+    private var chargeRefAt = 0L          // ...and when
+    private var drainWarnedAt = -1L
 
     // Camera state: only touched on the camera thread.
     private var camera: Camera? = null
@@ -117,6 +142,10 @@ class CameraService : Service() {
         config = Config.load(this)
         Storage.clipsDir.mkdirs()
         Storage.deleteBrokenClips()
+        prefs().let {
+            recordOn = it.getBoolean("record", true)
+            alertsOn = it.getBoolean("alerts", true)
+        }
 
         // Keep the CPU running while the screen is off.
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -124,18 +153,32 @@ class CameraService : Service() {
             setReferenceCounted(false)
             acquire()
         }
+        // Keep Wi-Fi awake too, or Telegram can't reach us while the screen is off.
+        val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "cctv").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+
+        bot = Bot(this)
+        bot.configure(config)
+        val version = packageManager.getPackageInfo(packageName, 0).versionName
+        bot.send("🟢 CCTV back online (v$version)\n" +
+            "Battery ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
+            "Recording ${onOff(recordOn)}, alerts ${onOff(alertsOn)}")
 
         camThread = HandlerThread("camera").apply { start() }
         cam = Handler(camThread.looper)
         cam.post { startCamera() }
         cam.postDelayed(watchdog, WATCHDOG_EVERY_MS)
         cam.post(statusLogger)
+        cam.post(batteryWatcher)
     }
 
     // Called every time someone starts the service, e.g. each time the app is opened.
     // START_STICKY: if Android kills the service for memory, it restarts it later.
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (startId > 1) cam.post { config = Config.load(this) } // opening the app again = reload settings
+        if (startId > 1) reload() // opening the app again = reload settings
         return START_STICKY
     }
 
@@ -145,6 +188,8 @@ class CameraService : Service() {
         cam.post { stopRecording(); stopCamera() }
         camThread.quitSafely()
         main.post { removeOverlay() }
+        bot.stop()
+        wifiLock?.release()
         wakeLock?.release()
         super.onDestroy()
     }
@@ -160,12 +205,13 @@ class CameraService : Service() {
         }
         try {
             val id = backCameraId()
+            rotation = Camera.CameraInfo().also { Camera.getCameraInfo(id, it) }.orientation
             val c = Camera.open(id)
             camera = c
             val p = c.parameters
             if (!loggedCapabilities) {
                 loggedCapabilities = true
-                FileLog.i("cameras=${Camera.getNumberOfCameras()} using id=$id")
+                FileLog.i("cameras=${Camera.getNumberOfCameras()} using id=$id, sensor rotation=$rotation°")
                 FileLog.i("preview sizes: " + p.supportedPreviewSizes.joinToString { "${it.width}x${it.height}" })
                 FileLog.i("focus modes: ${p.supportedFocusModes}")
             }
@@ -245,6 +291,25 @@ class CameraService : Service() {
             saveJpeg(data, File(FileLog.dir, "test.jpg"))
         }
 
+        if (snapshotWanted) {
+            snapshotWanted = false
+            val label = labelTime.format(Date())
+            encodeJpeg(data)?.let { bot.sendPhoto(it, rotation, label, "📷 $label") }
+        }
+
+        if (clipWantedSeconds > 0) {
+            val secs = clipWantedSeconds
+            clipWantedSeconds = 0
+            if (Storage.freeMB() < config.minFreeMB) {
+                bot.send("Not enough free storage to record (${Storage.freeMB()} MB free).")
+            } else {
+                startRecording(File(Storage.clipsDir, fileTime.format(Date()) + ".mp4"), secs, sendWhenDone = true)
+                if (recorder != null) return@PreviewCallback // camera now belongs to MediaRecorder
+                bot.send("Recording failed, see /log")
+                return@PreviewCallback // buffers were re-attached by resumeAfterRecording
+            }
+        }
+
         // Only analyse ~analyzeFps frames per second; skip the rest.
         if (now >= warmUntil && now - lastAnalyzedAt >= 1000L / config.analyzeFps) {
             lastAnalyzedAt = now
@@ -284,18 +349,24 @@ class CameraService : Service() {
             return
         }
 
-        // Still photo of the moment motion was seen (Phase 3 sends this as the alert).
-        saveJpeg(frame, File(Storage.clipsDir, "$name.jpg"))
+        // Still photo of the moment motion was seen; also the Telegram alert.
+        val jpeg = saveJpeg(frame, File(Storage.clipsDir, "$name.jpg"))
+        val cooldownMs = config.alertCooldownSeconds * 1000L
+        if (alertsOn && jpeg != null && (lastAlertAt < 0 || now - lastAlertAt >= cooldownMs)) {
+            lastAlertAt = now
+            val label = labelTime.format(Date())
+            bot.sendPhoto(jpeg, rotation, label, "🚨 Motion at $label (${"%.0f".format(share * 100)}% of view changed)")
+        }
 
-        if (photoOnly) {
+        if (photoOnly || !recordOn) {
             warmUntil = now + config.clipSeconds * 1000L // at most one photo per clip length
             detector.reset()
         } else {
-            startRecording(File(Storage.clipsDir, "$name.mp4"))
+            startRecording(File(Storage.clipsDir, "$name.mp4"), config.clipSeconds, sendWhenDone = false)
         }
     }
 
-    private fun startRecording(file: File) {
+    private fun startRecording(file: File, seconds: Int, sendWhenDone: Boolean) {
         val c = camera ?: return
         val r = MediaRecorder()
         try {
@@ -310,7 +381,8 @@ class CameraService : Service() {
             r.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
             r.setOutputFile(file.path)
             r.setPreviewDisplay(if (useOverlay) overlay?.holder?.surface else textureSurface)
-            r.setMaxDuration(config.clipSeconds * 1000)
+            r.setOrientationHint(rotation) // players show the video upright
+            r.setMaxDuration(seconds * 1000)
             r.setOnInfoListener { _, what, _ ->
                 if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) cam.post { stopRecording() }
             }
@@ -323,8 +395,9 @@ class CameraService : Service() {
             recorder = r
             recordingFile = file
             recordStartedAt = SystemClock.elapsedRealtime()
+            sendClipWhenDone = sendWhenDone
             // Backup in case the max-duration event never comes.
-            cam.postDelayed(recordTimeout, config.clipSeconds * 1000L + 5_000L)
+            cam.postDelayed(recordTimeout, seconds * 1000L + 5_000L)
         } catch (e: Exception) {
             FileLog.e("recording start failed", e)
             try { r.release() } catch (ignored: Exception) {}
@@ -360,11 +433,14 @@ class CameraService : Service() {
                 recordFailures = 0
                 statClips++
                 FileLog.i("clip saved ${f.name} ${f.length() / 1024} KB ${secs}s")
+                if (sendClipWhenDone) bot.sendVideo(f, "🎥 ${f.nameWithoutExtension} (${secs}s)")
             } else {
                 f.delete()
                 noteRecordFailure()
+                if (sendClipWhenDone) bot.send("Recording failed, see /log")
             }
         }
+        sendClipWhenDone = false
         resumeAfterRecording()
         Storage.enforceCap(config.storageCapMB)
     }
@@ -396,18 +472,27 @@ class CameraService : Service() {
         }
     }
 
-    /** NV21 → JPEG, written to a temp file and renamed so readers never see half a file. */
-    private fun saveJpeg(nv21: ByteArray, target: File) {
+    /** NV21 camera frame → JPEG bytes. */
+    private fun encodeJpeg(nv21: ByteArray): ByteArray? = try {
+        val out = ByteArrayOutputStream(64 * 1024)
+        YuvImage(nv21, ImageFormat.NV21, width, height, null).compressToJpeg(Rect(0, 0, width, height), 70, out)
+        out.toByteArray()
+    } catch (e: Exception) {
+        FileLog.e("JPEG encoding failed", e)
+        null
+    }
+
+    /** Saves a frame as JPEG via a temp file + rename, so readers never see half a file. Returns the bytes. */
+    private fun saveJpeg(nv21: ByteArray, target: File): ByteArray? {
+        val jpeg = encodeJpeg(nv21) ?: return null
         try {
             val tmp = File(target.parentFile, target.name + ".tmp")
-            FileOutputStream(tmp).use {
-                YuvImage(nv21, ImageFormat.NV21, width, height, null)
-                    .compressToJpeg(Rect(0, 0, width, height), 70, it)
-            }
+            FileOutputStream(tmp).use { it.write(jpeg) }
             if (!tmp.renameTo(target)) FileLog.w("rename ${target.name} failed")
         } catch (e: Exception) {
             FileLog.e("saving ${target.name} failed", e)
         }
+        return jpeg
     }
 
     // Runs every 10 s on the camera thread. Restarts the camera if frames stop.
@@ -451,10 +536,95 @@ class CameraService : Service() {
                 ", heap ${(rt.totalMemory() - rt.freeMemory()) / 1_048_576}/${rt.maxMemory() / 1_048_576} MB" +
                 " | analysed $statAnalyzed, max change ${"%.1f".format(statMaxShare * 100)}%" +
                 ", motions $statMotions, clips $statClips | files $count ($mb MB), disk free ${Storage.freeMB()} MB" +
-                " | " + batteryText() +
+                " | battery " + (BatteryInfo.read(this@CameraService)?.text() ?: "?") +
                 (if (photoOnly) " | PHOTO-ONLY" else ""))
             statAnalyzed = 0; statMaxShare = 0f; statMotions = 0; statClips = 0
             cam.postDelayed(this, STATUS_LOG_EVERY_MS)
+        }
+    }
+
+    /**
+     * Every minute: log the battery, and warn on Telegram when it is low, stops
+     * charging, or keeps dropping although the phone says it is charging (a charger
+     * too weak for camera + Wi-Fi, or a bad cable).
+     */
+    private val batteryWatcher = object : Runnable {
+        override fun run() {
+            try {
+                checkBattery()
+            } catch (e: Exception) {
+                FileLog.e("battery check failed", e)
+            }
+            cam.postDelayed(this, BATTERY_EVERY_MS)
+        }
+    }
+
+    private fun checkBattery() {
+        val b = BatteryInfo.read(this) ?: return
+        val now = SystemClock.elapsedRealtime()
+        FileLog.i("battery: ${b.text()}")
+
+        if (b.pct in 0 until LOW_BATTERY_PCT && !lowBatteryWarned) {
+            lowBatteryWarned = true
+            bot.send("🪫 Battery low: ${b.text()}")
+        } else if (b.pct >= LOW_BATTERY_PCT + 5) {
+            lowBatteryWarned = false
+        }
+
+        val prev = wasCharging
+        if (prev != false && !b.charging) bot.send("⚠️ Phone is not charging: ${b.text()}")
+        if (prev == false && b.charging) bot.send("🔌 Charging again: ${b.text()}")
+        wasCharging = b.charging
+
+        // "Charging" but the level keeps falling: compare with the best level of the last hour.
+        if (!b.charging || b.pct > chargeRefPct || now - chargeRefAt > 60 * 60_000L) {
+            chargeRefPct = b.pct
+            chargeRefAt = now
+        } else if (chargeRefPct - b.pct >= 3 && (drainWarnedAt < 0 || now - drainWarnedAt > 60 * 60_000L)) {
+            drainWarnedAt = now
+            bot.send("⚠️ Battery is DROPPING while plugged in ($chargeRefPct% → ${b.pct}% in " +
+                "${(now - chargeRefAt) / 60_000} min). The charger or cable can't keep up.\n${b.text()}")
+        }
+    }
+
+    private fun statusText(): String {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val mi = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
+        val (count, mb) = Storage.stats()
+        val wifi = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo
+        val bars = WifiManager.calculateSignalLevel(wifi.rssi, 5)
+        return "📊 CCTV status\n" +
+            "Up: ${duration(SystemClock.elapsedRealtime() - serviceStartedAt)} (phone up ${duration(SystemClock.elapsedRealtime())})\n" +
+            "Battery: ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
+            "Storage: $count files, $mb MB of ${config.storageCapMB} MB cap, ${Storage.freeMB()} MB free\n" +
+            "Recording: ${onOff(recordOn)}${if (photoOnly) " (photo-only fallback)" else ""}, alerts: ${onOff(alertsOn)}\n" +
+            "RAM free: ${mi.availMem / 1_048_576} MB of ${mi.totalMem / 1_048_576} MB\n" +
+            "Wi-Fi: ${wifi.rssi} dBm ($bars/4)\n" +
+            "Camera: ${if (camera != null || recorder != null) "${width}x$height" else "NOT RUNNING"}${if (recorder != null) ", recording now" else ""}"
+    }
+
+    private fun duration(ms: Long): String {
+        val m = ms / 60_000
+        return if (m < 60) "${m}m" else if (m < 24 * 60) "${m / 60}h ${m % 60}m" else "${m / 1440}d ${(m % 1440) / 60}h"
+    }
+
+    private fun onOff(b: Boolean) = if (b) "ON" else "OFF"
+
+    private fun prefs() = getSharedPreferences("state", Context.MODE_PRIVATE)
+
+    // ---------------------------------------------------------------- Telegram commands (Bot.Control)
+    // Called on the "tg-poll" thread; the work is posted to the camera thread.
+
+    override fun snapshot() { cam.post { snapshotWanted = true } } // taken from the next frame
+    override fun clip(seconds: Int) { cam.post { clipWantedSeconds = seconds.coerceIn(1, MAX_CLIP_S) } }
+    override fun status() { cam.post { bot.send(statusText()) } }
+    override fun setRecording(on: Boolean) { recordOn = on; prefs().edit().putBoolean("record", on).apply() }
+    override fun setAlerts(on: Boolean) { alertsOn = on; prefs().edit().putBoolean("alerts", on).apply() }
+    override fun reload() {
+        cam.post {
+            config = Config.load(this)
+            bot.configure(config)
+            bot.send("Settings reloaded.")
         }
     }
 
@@ -519,32 +689,6 @@ class CameraService : Service() {
         sizes.filter { it.width <= WANT_W && it.height <= WANT_H }
             .maxByOrNull { it.width * it.height }?.let { return it }
         return sizes.minByOrNull { it.width * it.height }!!
-    }
-
-    /**
-     * Battery level, charging state and temperature. ACTION_BATTERY_CHANGED is a
-     * "sticky" broadcast: registering with a null receiver just returns the latest value.
-     */
-    private fun batteryText(): String {
-        val b = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return "battery ?"
-        val level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-        val scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-        val pct = if (level >= 0 && scale > 0) level * 100 / scale else -1
-        val state = when (b.getIntExtra(BatteryManager.EXTRA_STATUS, -1)) {
-            BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
-            BatteryManager.BATTERY_STATUS_FULL -> "full"
-            BatteryManager.BATTERY_STATUS_DISCHARGING -> "DISCHARGING"
-            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "NOT CHARGING"
-            else -> "unknown"
-        }
-        val plug = when (b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)) {
-            BatteryManager.BATTERY_PLUGGED_AC -> " (AC)"
-            BatteryManager.BATTERY_PLUGGED_USB -> " (USB)"
-            0 -> " (unplugged)"
-            else -> ""
-        }
-        val tempC = b.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -10) / 10.0
-        return "battery $pct% $state$plug ${"%.1f".format(tempC)}°C"
     }
 
     private fun isScreenOn(): Boolean =

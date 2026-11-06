@@ -28,6 +28,21 @@ object FileLog {
     fun w(msg: String, t: Throwable? = null) = write("W", msg, t)
     fun e(msg: String, t: Throwable? = null) = write("E", msg, t)
 
+    /** The last [lines] lines of the log (reads only the end of the file). */
+    @Synchronized
+    fun tail(lines: Int): String = try {
+        java.io.RandomAccessFile(file, "r").use { raf ->
+            val start = (raf.length() - 16_384).coerceAtLeast(0)
+            raf.seek(start)
+            val buf = ByteArray((raf.length() - start).toInt())
+            raf.readFully(buf)
+            String(buf, Charsets.UTF_8).lines().filter { it.isNotEmpty() }.takeLast(lines)
+                .joinToString("\n").takeLast(3900)
+        }
+    } catch (e: Exception) {
+        "log not readable: ${e.javaClass.simpleName}"
+    }
+
     @Synchronized
     private fun write(level: String, msg: String, t: Throwable?) {
         val line = StringBuilder()

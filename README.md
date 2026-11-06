@@ -10,6 +10,11 @@ Plain Kotlin and Android framework APIs only (no AndroidX), built on GitHub Acti
   (`YYYY-MM-DD_HH-MM-SS.mp4` plus a `.jpg` of the moment motion was seen), and a size cap
   (oldest deleted first). Clips cut off by a crash or power loss are deleted at startup.
   `/sdcard/cctv/test.jpg` is refreshed every 60 s to check the view.
+- Phase 3: Telegram bot (long polling, no open ports). Photo alert on motion (at most one
+  per `alertCooldownSeconds`), commands `/snapshot`, `/clip N`, `/status`, `/record on|off`,
+  `/alerts on|off`, `/log`, `/reload`, `/help`. Warnings when the battery is below 30%, stops
+  charging, or drops while plugged in; a "back online" message when the app starts.
+  Only `telegramUserId` gets answers. Battery is logged every minute.
 
 ## Settings
 
@@ -19,6 +24,9 @@ Missing keys use these defaults:
 
 ```json
 {
+  "telegramBotToken": "123456:ABC...",
+  "telegramUserId": 123456789,
+  "alertCooldownSeconds": 120,
   "motionPixelDiff": 25,
   "motionThreshold": 0.02,
   "motionFrames": 2,

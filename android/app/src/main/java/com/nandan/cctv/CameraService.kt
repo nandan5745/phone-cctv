@@ -57,6 +57,9 @@ class CameraService : Service(), Bot.Control {
         private const val STATUS_LOG_EVERY_MS = 10 * 60_000L
         private const val BATTERY_EVERY_MS = 60_000L
         private const val LOW_BATTERY_PCT = 30
+        // This phone's % reading is unreliable (said 100% "Full" at 3.38 V on 2026-11-06).
+        // Voltage is the honest signal: a Li-ion cell near 3.4 V is almost empty.
+        private const val LOW_VOLTAGE_MV = 3600
         private const val MAX_CLIP_S = 30
         private const val WARMUP_AFTER_START_MS = 5_000L   // auto-exposure settling
         private const val WARMUP_AFTER_CLIP_MS = 1_500L
@@ -92,6 +95,7 @@ class CameraService : Service(), Bot.Control {
 
     // Battery watcher state (camera thread).
     private var lowBatteryWarned = false
+    private var lowVoltageWarned = false
     private var wasCharging: Boolean? = null
     private var chargeRefPct = -1         // highest % seen while plugged in...
     private var chargeRefAt = 0L          // ...and when
@@ -569,6 +573,14 @@ class CameraService : Service(), Bot.Control {
             bot.send("🪫 Battery low: ${b.text()}")
         } else if (b.pct >= LOW_BATTERY_PCT + 5) {
             lowBatteryWarned = false
+        }
+
+        if (b.voltageMv in 1 until LOW_VOLTAGE_MV && !lowVoltageWarned) {
+            lowVoltageWarned = true
+            bot.send("🪫 Battery voltage LOW: ${"%.2f".format(b.voltageMv / 1000.0)} V " +
+                "(phone shows ${b.pct}%, which is wrong on this phone). It may shut down soon.\n${b.text()}")
+        } else if (b.voltageMv >= LOW_VOLTAGE_MV + 150) {
+            lowVoltageWarned = false
         }
 
         val prev = wasCharging

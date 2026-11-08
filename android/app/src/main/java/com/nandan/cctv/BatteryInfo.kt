@@ -36,17 +36,19 @@ class BatteryInfo private constructor(
             0 -> "unplugged"
             else -> "plug=$plugged"
         }
-        val h = when (health) {
-            BatteryManager.BATTERY_HEALTH_GOOD -> "good"
-            BatteryManager.BATTERY_HEALTH_OVERHEAT -> "OVERHEAT"
-            BatteryManager.BATTERY_HEALTH_DEAD -> "DEAD"
-            BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "OVER-VOLTAGE"
-            BatteryManager.BATTERY_HEALTH_COLD -> "COLD"
-            BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "FAILURE"
-            else -> "unknown"
-        }
         return "$pct% $state ($plug) ${"%.1f".format(tempC)}°C ${"%.2f".format(voltageMv / 1000.0)}V" +
-            (currentMa?.let { " ${if (it > 0) "+" else ""}${it}mA" } ?: "") + " health=$h"
+            (currentMa?.let { " ${if (it > 0) "+" else ""}${it}mA" } ?: "") + " health=${healthText()}"
+    }
+
+    /** "good", "OVERHEAT", "DEAD", "OVER-VOLTAGE", "COLD", "FAILURE" or "unknown". */
+    fun healthText(): String = when (health) {
+        BatteryManager.BATTERY_HEALTH_GOOD -> "good"
+        BatteryManager.BATTERY_HEALTH_OVERHEAT -> "OVERHEAT"
+        BatteryManager.BATTERY_HEALTH_DEAD -> "DEAD"
+        BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "OVER-VOLTAGE"
+        BatteryManager.BATTERY_HEALTH_COLD -> "COLD"
+        BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "FAILURE"
+        else -> "unknown"
     }
 
     companion object {

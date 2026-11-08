@@ -28,10 +28,17 @@ class Config private constructor(j: JSONObject) {
     val storageCapMB: Int = j.optInt("storageCapMB", 1200).coerceAtLeast(50)
     val minFreeMB: Int = j.optInt("minFreeMB", 300).coerceAtLeast(50)
 
+    /** Battery temperature thresholds in °C (warning, critical, emergency = camera paused, resume). */
+    val tempWarnC: Double = j.optDouble("tempWarnC", 40.0)
+    val tempCriticalC: Double = j.optDouble("tempCriticalC", 45.0)
+    val tempEmergencyC: Double = j.optDouble("tempEmergencyC", 50.0)
+    val tempResumeC: Double = j.optDouble("tempResumeC", 42.0)
+
     /** For the log. Never includes the bot token itself. */
     override fun toString() =
         "pixelDiff=$motionPixelDiff threshold=$motionThreshold frames=$motionFrames fps=$analyzeFps " +
             "clip=${clipSeconds}s cap=${storageCapMB}MB minFree=${minFreeMB}MB cooldown=${alertCooldownSeconds}s " +
+            "temp=$tempWarnC/$tempCriticalC/$tempEmergencyC/$tempResumeC°C " +
             "telegram=${if (telegramBotToken.isNotEmpty() && telegramUserId != 0L) "set" else "not set"}"
 
     companion object {

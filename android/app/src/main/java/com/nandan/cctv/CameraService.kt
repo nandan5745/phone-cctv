@@ -28,6 +28,9 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.WindowManager
+import com.nandan.cctv.core.BatteryEvent
+import com.nandan.cctv.core.BatteryMonitor
+import com.nandan.cctv.core.BatterySample
 import com.nandan.cctv.core.MotionDetector
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -74,10 +77,7 @@ class CameraService : Service(), Bot.Control {
         private const val NO_FRAMES_LIMIT_MS = 15_000L
         private const val STATUS_LOG_EVERY_MS = 10 * 60_000L
         private const val BATTERY_EVERY_MS = 60_000L
-        private const val LOW_BATTERY_PCT = 30
-        // This phone's % reading is unreliable (said 100% "Full" at 3.38 V on 2026-11-06).
-        // Voltage is the honest signal: a Li-ion cell near 3.4 V is almost empty.
-        private const val LOW_VOLTAGE_MV = 3600
+        private const val TEST_TEMP_CHECKS = 3   // /testtemp fakes the temperature for this many checks
         private const val MAX_CLIP_S = 30
         private const val WARMUP_AFTER_START_MS = 5_000L   // auto-exposure settling
         private const val WARMUP_AFTER_CLIP_MS = 1_500L
@@ -115,9 +115,13 @@ class CameraService : Service(), Bot.Control {
     private var lastAlertAt = -1L
 
     // Battery watcher state (camera thread).
-    private var lowBatteryWarned = false
-    private var lowVoltageWarned = false
-    private var wasCharging: Boolean? = null
+    // Low %, low voltage (this phone's % is unreliable, voltage isn't), charging and
+    // temperature warnings live in the tested core class.
+    private lateinit var batteryMonitor: BatteryMonitor
+    private var heatPaused = false         // camera stopped to cool down
+    private var testTempC = 0.0            // /testtemp override...
+    private var testTempChecksLeft = 0     // ...for this many checks
+    private var maxTempDay = ""            // date the max temperature belongs to
     private var chargeRefPct = -1         // highest % seen while plugged in...
     private var chargeRefAt = 0L          // ...and when
     private var drainWarnedAt = -1L
@@ -166,6 +170,7 @@ class CameraService : Service(), Bot.Control {
         running = true
         startForeground(NOTIFICATION_ID, buildNotification())
         config = Config.load(this)
+        batteryMonitor = newBatteryMonitor()
         Storage.clipsDir.mkdirs()
         Storage.deleteBrokenClips()
         prefs().let {
@@ -254,6 +259,7 @@ class CameraService : Service(), Bot.Control {
 
     private fun startCamera() {
         if (camera != null) return
+        if (heatPaused) return // cooling down; ResumeAfterHeat starts it again
         val holder = overlay?.holder
         if (useOverlay && (holder == null || !holder.surface.isValid)) {
             FileLog.w("overlay surface not ready yet, waiting")
@@ -562,7 +568,7 @@ class CameraService : Service(), Bot.Control {
                 if (recorder != null) {
                     // No frames while recording is normal.
                 } else if (camera == null) {
-                    startCamera()
+                    startCamera() // does nothing while heatPaused
                 } else {
                     val since = if (lastFrameAt == 0L) startedAt else lastFrameAt
                     if (now - since > NO_FRAMES_LIMIT_MS) {
@@ -618,30 +624,42 @@ class CameraService : Service(), Bot.Control {
         }
     }
 
+    private fun newBatteryMonitor() = BatteryMonitor(
+        warnC = config.tempWarnC, criticalC = config.tempCriticalC,
+        emergencyC = config.tempEmergencyC, resumeC = config.tempResumeC,
+    )
+
     private fun checkBattery() {
         val b = BatteryInfo.read(this) ?: return
         val now = SystemClock.elapsedRealtime()
+        var tempC = b.tempC
+        if (testTempChecksLeft > 0) {
+            testTempChecksLeft--
+            tempC = testTempC
+            FileLog.w("testtemp: using fake ${tempC}°C (${testTempChecksLeft} checks left)")
+        }
         FileLog.i("battery: ${b.text()}")
 
-        if (b.pct in 0 until LOW_BATTERY_PCT && !lowBatteryWarned) {
-            lowBatteryWarned = true
-            bot.send("🪫 Battery low: ${b.text()}")
-        } else if (b.pct >= LOW_BATTERY_PCT + 5) {
-            lowBatteryWarned = false
-        }
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        if (today != maxTempDay) { maxTempDay = today; batteryMonitor.resetMax() }
 
-        if (b.voltageMv in 1 until LOW_VOLTAGE_MV && !lowVoltageWarned) {
-            lowVoltageWarned = true
-            bot.send("🪫 Battery voltage LOW: ${"%.2f".format(b.voltageMv / 1000.0)} V " +
-                "(phone shows ${b.pct}%, which is wrong on this phone). It may shut down soon.\n${b.text()}")
-        } else if (b.voltageMv >= LOW_VOLTAGE_MV + 150) {
-            lowVoltageWarned = false
+        val sample = BatterySample(b.pct, b.charging, tempC, b.voltageMv, b.healthText(), System.currentTimeMillis())
+        for (e in batteryMonitor.update(sample)) {
+            when (e) {
+                is BatteryEvent.Notify -> bot.send("${e.text}\n${b.text()}")
+                BatteryEvent.PauseForHeat -> {
+                    FileLog.w("heat: ${tempC}°C, pausing camera")
+                    heatPaused = true
+                    stopRecording()
+                    stopCamera()
+                }
+                BatteryEvent.ResumeAfterHeat -> {
+                    FileLog.i("heat: cooled to ${tempC}°C, resuming camera")
+                    heatPaused = false
+                    startCamera()
+                }
+            }
         }
-
-        val prev = wasCharging
-        if (prev != false && !b.charging) bot.send("⚠️ Phone is not charging: ${b.text()}")
-        if (prev == false && b.charging) bot.send("🔌 Charging again: ${b.text()}")
-        wasCharging = b.charging
 
         // "Charging" but the level keeps falling: compare with the best level of the last hour.
         if (!b.charging || b.pct > chargeRefPct || now - chargeRefAt > 60 * 60_000L) {
@@ -663,11 +681,12 @@ class CameraService : Service(), Bot.Control {
         return "📊 CCTV status\n" +
             "Up: ${duration(SystemClock.elapsedRealtime() - serviceStartedAt)} (phone up ${duration(SystemClock.elapsedRealtime())})\n" +
             "Battery: ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
+            "Temp: ${BatteryInfo.read(this)?.let { "%.1f".format(it.tempC) } ?: "?"} °C (max today ${"%.1f".format(batteryMonitor.maxTempC)})\n" +
             "Storage: $count files, $mb MB of ${config.storageCapMB} MB cap, ${Storage.freeMB()} MB free\n" +
             "Recording: ${onOff(recordOn)}${if (photoOnly) " (photo-only fallback)" else ""}, alerts: ${onOff(alertsOn)}, videos: ${onOff(videosOn)}\n" +
             "RAM free: ${mi.availMem / 1_048_576} MB of ${mi.totalMem / 1_048_576} MB\n" +
             "Wi-Fi: ${wifi.rssi} dBm ($bars/4)\n" +
-            "Camera: ${if (camera != null || recorder != null) "${width}x$height" else "NOT RUNNING"}${if (recorder != null) ", recording now" else ""}"
+            "Camera: ${if (heatPaused) "PAUSED (too hot)" else if (camera != null || recorder != null) "${width}x$height" else "NOT RUNNING"}${if (recorder != null) ", recording now" else ""}"
     }
 
     private fun duration(ms: Long): String {
@@ -723,6 +742,14 @@ class CameraService : Service(), Bot.Control {
         cam.postDelayed({ FileLog.w("testkill: killing own process"); android.os.Process.killProcess(android.os.Process.myPid()) }, 2_000)
     }
 
+    override fun testTemp(celsius: Double) {
+        cam.post {
+            testTempC = celsius
+            testTempChecksLeft = TEST_TEMP_CHECKS
+            checkBattery() // apply now; the next checks run every minute
+        }
+    }
+
     override fun testStop() {
         // A clean stop: START_STICKY won't restart this, only the 1-minute alarm will.
         main.postDelayed({ FileLog.w("teststop: stopping service"); stopSelf() }, 2_000)
@@ -731,6 +758,7 @@ class CameraService : Service(), Bot.Control {
         cam.post {
             config = Config.load(this)
             bot.configure(config)
+            if (!heatPaused) batteryMonitor = newBatteryMonitor() // new thresholds; keep state while paused
             bot.send("Settings reloaded.")
         }
     }

@@ -1,4 +1,4 @@
-package com.nandan.cctv
+package com.nandan.cctv.core
 
 /**
  * Compares tiny grayscale versions of consecutive frames.
@@ -16,6 +16,10 @@ class MotionDetector(private val cols: Int = 80, private val rows: Int = 60) {
     private var prev = IntArray(cols * rows)
     private var prevMean = 0
     private var hasPrev = false
+
+    /** Average brightness (0-255) of the last frame analysed; used for darkness detection. */
+    var lastMean = 0
+        private set
 
     /** Forget the previous frame (after the camera restarts or a clip ends). */
     fun reset() {
@@ -39,6 +43,7 @@ class MotionDetector(private val cols: Int = 80, private val rows: Int = 60) {
             }
         }
         val mean = sum / cur.size
+        lastMean = mean
 
         var result = -1f
         if (hasPrev) {

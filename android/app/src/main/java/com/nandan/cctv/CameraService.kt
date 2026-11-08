@@ -28,6 +28,7 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.WindowManager
+import com.nandan.cctv.core.MotionDetector
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream

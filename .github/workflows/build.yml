@@ -42,7 +42,8 @@ jobs:
           CCTV_KEYSTORE_PASSWORD: ${{ secrets.CCTV_KEYSTORE_PASSWORD }}
           CCTV_KEY_PASSWORD: ${{ secrets.CCTV_KEYSTORE_PASSWORD }}
           CCTV_KEY_ALIAS: cctv
-        run: gradle --no-daemon assembleRelease
+        # Unit tests first: a failing test stops the build, so no APK is produced.
+        run: gradle --no-daemon testReleaseUnitTest assembleRelease
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/release/app-release.apk cctv.apk

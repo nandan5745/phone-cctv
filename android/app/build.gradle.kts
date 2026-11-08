@@ -53,3 +53,9 @@ android {
         checkReleaseBuilds = false
     }
 }
+
+dependencies {
+    // Test-only: JVM unit tests for the Android-free core package (never shipped in the APK).
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013") // real org.json; android.jar only has stubs
+}

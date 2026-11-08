@@ -27,34 +27,28 @@ sealed class BatteryEvent {
  * threshold doesn't send a message every minute.
  */
 class BatteryMonitor(
-    private val warnC: Double = 40.0,
-    private val criticalC: Double = 45.0,
-    private val emergencyC: Double = 50.0,
-    private val resumeC: Double = 42.0,
-    private val hysteresisC: Double = 2.0,
+    warnC: Double = 40.0,
+    criticalC: Double = 45.0,
+    emergencyC: Double = 50.0,
+    resumeC: Double = 42.0,
+    hysteresisC: Double = 2.0,
     private val lowPct: Int = 30,
     private val lowVoltageMv: Int = 3600,
 ) {
-    var tempState = TempState.NORMAL
-        private set
-    var maxTempC = 0.0
-        private set
+    private val heat = HeatMonitor("Battery", warnC, criticalC, emergencyC, resumeC, hysteresisC)
+    val tempState get() = heat.state
+    val maxTempC get() = heat.maxC
 
     private var lowPctWarned = false
     private var lowVoltageWarned = false
     private var wasCharging: Boolean? = null
     private var lastHealth: String? = null
 
-    fun resetMax() {
-        maxTempC = 0.0
-    }
+    fun resetMax() = heat.resetMax()
 
     fun update(s: BatterySample): List<BatteryEvent> {
         val events = mutableListOf<BatteryEvent>()
-        if (s.tempC > 0.0 && s.tempC <= 100.0) {
-            if (s.tempC > maxTempC) maxTempC = s.tempC
-            updateTemp(s.tempC, events)
-        }
+        events += heat.update(s.tempC)
 
         if (s.pct in 0 until lowPct && !lowPctWarned) {
             lowPctWarned = true
@@ -87,46 +81,4 @@ class BatteryMonitor(
         lastHealth = s.health
         return events
     }
-
-    private fun updateTemp(t: Double, events: MutableList<BatteryEvent>) {
-        val risen = when {
-            t >= emergencyC -> TempState.EMERGENCY
-            t >= criticalC -> TempState.CRITICAL
-            t >= warnC -> TempState.WARNING
-            else -> TempState.NORMAL
-        }
-        val before = tempState
-        if (risen > before) {
-            tempState = risen
-            events += BatteryEvent.Notify(
-                when (risen) {
-                    TempState.WARNING -> "🌡️ Battery warm: ${fmt(t)} °C"
-                    TempState.CRITICAL -> "🔥 Battery HOT: ${fmt(t)} °C. Check the charger and airflow."
-                    else -> "🚨 Battery ${fmt(t)} °C: camera stopped to cool down."
-                }
-            )
-            if (risen == TempState.EMERGENCY) events += BatteryEvent.PauseForHeat
-            return
-        }
-        // Cooling: leave each level only once clearly below it.
-        while (tempState != TempState.NORMAL && t < exitBelow(tempState)) {
-            tempState = TempState.values()[tempState.ordinal - 1]
-        }
-        if (before == TempState.EMERGENCY && tempState != TempState.EMERGENCY) {
-            events += BatteryEvent.Notify("❄️ Cooled to ${fmt(t)} °C: camera back on.")
-            events += BatteryEvent.ResumeAfterHeat
-        }
-        if (before != TempState.NORMAL && tempState == TempState.NORMAL) {
-            events += BatteryEvent.Notify("✅ Battery temperature normal: ${fmt(t)} °C")
-        }
-    }
-
-    private fun exitBelow(s: TempState) = when (s) {
-        TempState.WARNING -> warnC - hysteresisC
-        TempState.CRITICAL -> criticalC - hysteresisC
-        TempState.EMERGENCY -> resumeC
-        TempState.NORMAL -> Double.NEGATIVE_INFINITY
-    }
-
-    private fun fmt(t: Double) = "%.1f".format(t)
 }

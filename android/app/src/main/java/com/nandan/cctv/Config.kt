@@ -34,11 +34,17 @@ class Config private constructor(j: JSONObject) {
     val tempEmergencyC: Double = j.optDouble("tempEmergencyC", 50.0)
     val tempResumeC: Double = j.optDouble("tempResumeC", 42.0)
 
+    /** Processor (sensor_arm) thresholds. It runs ~52 °C normally; the battery reading follows the charger. */
+    val cpuWarnC: Double = j.optDouble("cpuWarnC", 70.0)
+    val cpuCriticalC: Double = j.optDouble("cpuCriticalC", 80.0)
+    val cpuEmergencyC: Double = j.optDouble("cpuEmergencyC", 85.0)
+    val cpuResumeC: Double = j.optDouble("cpuResumeC", 75.0)
+
     /** For the log. Never includes the bot token itself. */
     override fun toString() =
         "pixelDiff=$motionPixelDiff threshold=$motionThreshold frames=$motionFrames fps=$analyzeFps " +
             "clip=${clipSeconds}s cap=${storageCapMB}MB minFree=${minFreeMB}MB cooldown=${alertCooldownSeconds}s " +
-            "temp=$tempWarnC/$tempCriticalC/$tempEmergencyC/$tempResumeC°C " +
+            "temp=$tempWarnC/$tempCriticalC/$tempEmergencyC/$tempResumeC°C cpu=$cpuWarnC/$cpuCriticalC/$cpuEmergencyC/$cpuResumeC°C " +
             "telegram=${if (telegramBotToken.isNotEmpty() && telegramUserId != 0L) "set" else "not set"}"
 
     companion object {

@@ -31,6 +31,7 @@ import android.view.WindowManager
 import com.nandan.cctv.core.BatteryEvent
 import com.nandan.cctv.core.BatteryMonitor
 import com.nandan.cctv.core.BatterySample
+import com.nandan.cctv.core.HeatMonitor
 import com.nandan.cctv.core.MotionDetector
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -118,9 +119,15 @@ class CameraService : Service(), Bot.Control {
     // Low %, low voltage (this phone's % is unreliable, voltage isn't), charging and
     // temperature warnings live in the tested core class.
     private lateinit var batteryMonitor: BatteryMonitor
-    private var heatPaused = false         // camera stopped to cool down
+    // The battery reading follows the charger more than real heat (measured 2026-11-08),
+    // so the processor sensor is watched too. The camera pauses while either is too hot.
+    private lateinit var cpuHeat: HeatMonitor
+    private val heatPausedBy = mutableSetOf<String>()
+    private val heatPaused get() = heatPausedBy.isNotEmpty()
     private var testTempC = 0.0            // /testtemp override...
     private var testTempChecksLeft = 0     // ...for this many checks
+    private var testTempCpu = false        // ...applied to the CPU sensor instead of the battery
+    private var cpuZone: File? = null      // /sys/class/thermal/thermal_zoneN of "sensor_arm"
     private var maxTempDay = ""            // date the max temperature belongs to
     private var chargeRefPct = -1         // highest % seen while plugged in...
     private var chargeRefAt = 0L          // ...and when
@@ -171,6 +178,10 @@ class CameraService : Service(), Bot.Control {
         startForeground(NOTIFICATION_ID, buildNotification())
         config = Config.load(this)
         batteryMonitor = newBatteryMonitor()
+        cpuHeat = newCpuHeat()
+        cpuZone = File("/sys/class/thermal").listFiles()
+            ?.firstOrNull { File(it, "type").let { t -> t.canRead() && t.readText().trim() == "sensor_arm" } }
+        FileLog.i("cpu temperature sensor: ${cpuZone?.name ?: "not found"}")
         Storage.clipsDir.mkdirs()
         Storage.deleteBrokenClips()
         prefs().let {
@@ -629,37 +640,35 @@ class CameraService : Service(), Bot.Control {
         emergencyC = config.tempEmergencyC, resumeC = config.tempResumeC,
     )
 
+    private fun newCpuHeat() = HeatMonitor(
+        "Phone CPU", config.cpuWarnC, config.cpuCriticalC, config.cpuEmergencyC, config.cpuResumeC, maxValidC = 150.0,
+    )
+
+    /** Processor temperature in °C, or null if the sensor isn't readable. */
+    private fun cpuTempC(): Double? = try {
+        cpuZone?.let { File(it, "temp").readText().trim().toDouble() / 1000.0 }
+    } catch (e: Exception) {
+        null
+    }
+
     private fun checkBattery() {
         val b = BatteryInfo.read(this) ?: return
         val now = SystemClock.elapsedRealtime()
         var tempC = b.tempC
+        var cpuC = cpuTempC()
         if (testTempChecksLeft > 0) {
             testTempChecksLeft--
-            tempC = testTempC
-            FileLog.w("testtemp: using fake ${tempC}°C (${testTempChecksLeft} checks left)")
+            if (testTempCpu) cpuC = testTempC else tempC = testTempC
+            FileLog.w("testtemp: fake ${if (testTempCpu) "cpu" else "battery"} ${testTempC}°C (${testTempChecksLeft} checks left)")
         }
-        FileLog.i("battery: ${b.text()}")
+        FileLog.i("battery: ${b.text()} | cpu ${cpuC?.let { "%.1f".format(it) } ?: "?"}°C")
 
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        if (today != maxTempDay) { maxTempDay = today; batteryMonitor.resetMax() }
+        if (today != maxTempDay) { maxTempDay = today; batteryMonitor.resetMax(); cpuHeat.resetMax() }
 
         val sample = BatterySample(b.pct, b.charging, tempC, b.voltageMv, b.healthText(), System.currentTimeMillis())
-        for (e in batteryMonitor.update(sample)) {
-            when (e) {
-                is BatteryEvent.Notify -> bot.send("${e.text}\n${b.text()}")
-                BatteryEvent.PauseForHeat -> {
-                    FileLog.w("heat: ${tempC}°C, pausing camera")
-                    heatPaused = true
-                    stopRecording()
-                    stopCamera()
-                }
-                BatteryEvent.ResumeAfterHeat -> {
-                    FileLog.i("heat: cooled to ${tempC}°C, resuming camera")
-                    heatPaused = false
-                    startCamera()
-                }
-            }
-        }
+        handleHeatEvents("battery", tempC, batteryMonitor.update(sample), b)
+        if (cpuC != null) handleHeatEvents("cpu", cpuC, cpuHeat.update(cpuC), b)
 
         // "Charging" but the level keeps falling: compare with the best level of the last hour.
         if (!b.charging || b.pct > chargeRefPct || now - chargeRefAt > 60 * 60_000L) {
@@ -672,6 +681,25 @@ class CameraService : Service(), Bot.Control {
         }
     }
 
+    private fun handleHeatEvents(sensor: String, tempC: Double, events: List<BatteryEvent>, b: BatteryInfo) {
+        for (e in events) {
+            when (e) {
+                is BatteryEvent.Notify -> bot.send("${e.text}\n${b.text()}")
+                BatteryEvent.PauseForHeat -> {
+                    FileLog.w("heat: $sensor ${tempC}°C, pausing camera")
+                    heatPausedBy += sensor
+                    stopRecording()
+                    stopCamera()
+                }
+                BatteryEvent.ResumeAfterHeat -> {
+                    heatPausedBy -= sensor
+                    FileLog.i("heat: $sensor cooled to ${tempC}°C${if (heatPaused) ", still paused by $heatPausedBy" else ", resuming camera"}")
+                    startCamera() // does nothing while another sensor is still too hot
+                }
+            }
+        }
+    }
+
     private fun statusText(): String {
         val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val mi = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
@@ -681,7 +709,8 @@ class CameraService : Service(), Bot.Control {
         return "📊 CCTV status\n" +
             "Up: ${duration(SystemClock.elapsedRealtime() - serviceStartedAt)} (phone up ${duration(SystemClock.elapsedRealtime())})\n" +
             "Battery: ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
-            "Temp: ${BatteryInfo.read(this)?.let { "%.1f".format(it.tempC) } ?: "?"} °C (max today ${"%.1f".format(batteryMonitor.maxTempC)})\n" +
+            "Temp: battery ${BatteryInfo.read(this)?.let { "%.1f".format(it.tempC) } ?: "?"} °C (max today ${"%.1f".format(batteryMonitor.maxTempC)}), " +
+            "CPU ${cpuTempC()?.let { "%.1f".format(it) } ?: "?"} °C (max today ${"%.1f".format(cpuHeat.maxC)})\n" +
             "Storage: $count files, $mb MB of ${config.storageCapMB} MB cap, ${Storage.freeMB()} MB free\n" +
             "Recording: ${onOff(recordOn)}${if (photoOnly) " (photo-only fallback)" else ""}, alerts: ${onOff(alertsOn)}, videos: ${onOff(videosOn)}\n" +
             "RAM free: ${mi.availMem / 1_048_576} MB of ${mi.totalMem / 1_048_576} MB\n" +
@@ -742,9 +771,10 @@ class CameraService : Service(), Bot.Control {
         cam.postDelayed({ FileLog.w("testkill: killing own process"); android.os.Process.killProcess(android.os.Process.myPid()) }, 2_000)
     }
 
-    override fun testTemp(celsius: Double) {
+    override fun testTemp(celsius: Double, cpu: Boolean) {
         cam.post {
             testTempC = celsius
+            testTempCpu = cpu
             testTempChecksLeft = TEST_TEMP_CHECKS
             checkBattery() // apply now; the next checks run every minute
         }
@@ -758,7 +788,7 @@ class CameraService : Service(), Bot.Control {
         cam.post {
             config = Config.load(this)
             bot.configure(config)
-            if (!heatPaused) batteryMonitor = newBatteryMonitor() // new thresholds; keep state while paused
+            if (!heatPaused) { batteryMonitor = newBatteryMonitor(); cpuHeat = newCpuHeat() } // new thresholds; keep state while paused
             bot.send("Settings reloaded.")
         }
     }

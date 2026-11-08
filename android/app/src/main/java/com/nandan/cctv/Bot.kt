@@ -31,7 +31,7 @@ class Bot(private val control: Control) {
         fun reload()
         fun testKill()
         fun testStop()
-        fun testTemp(celsius: Double)
+        fun testTemp(celsius: Double, cpu: Boolean)
     }
 
     companion object {
@@ -53,7 +53,7 @@ class Bot(private val control: Control) {
             "Testing only:\n" +
             "/testkill – crash the app on purpose (it should come back by itself)\n" +
             "/teststop – stop the camera service (the 1-minute check should restart it)\n" +
-            "/testtemp C – pretend the battery is C °C for 3 minutes"
+            "/testtemp C – pretend the battery is C °C for 3 minutes (/testtemp cpu C for the processor)"
     }
 
     @Volatile private var config: Config? = null
@@ -214,9 +214,10 @@ class Bot(private val control: Control) {
             "/testkill" -> { send("Killing the app now. Expect a 'back online' message."); control.testKill() }
             "/teststop" -> { send("Stopping the service. The 1-minute check should restart it."); control.testStop() }
             "/testtemp" -> {
-                val c = arg?.toDoubleOrNull()
-                if (c == null || c !in 1.0..100.0) send("Usage: /testtemp 51   (°C, 1 to 100)")
-                else { send("Pretending the battery is $c °C for 3 minutes."); control.testTemp(c) }
+                val cpu = arg == "cpu"
+                val c = (if (cpu) parts.getOrNull(2) else arg)?.toDoubleOrNull()
+                if (c == null || c !in 1.0..150.0) send("Usage: /testtemp 51   or   /testtemp cpu 86")
+                else { send("Pretending the ${if (cpu) "processor" else "battery"} is $c °C for 3 minutes."); control.testTemp(c, cpu) }
             }
             "/log" -> send(FileLog.tail(30))
             "/reload" -> control.reload()

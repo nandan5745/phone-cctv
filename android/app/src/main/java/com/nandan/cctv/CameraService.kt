@@ -225,7 +225,7 @@ class CameraService : Service(), Bot.Control {
             greeted = true
             FileLog.i("started: $reason")
             val version = packageManager.getPackageInfo(packageName, 0).versionName
-            bot.sendWhenOnline("🟢 CCTV back online (v$version)\n" +
+            bot.send("🟢 CCTV back online (v$version)\n" +
                 "Why: $reason\n" +
                 "Battery ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
                 "Recording ${onOff(recordOn)}, alerts ${onOff(alertsOn)}, videos ${onOff(videosOn)}")
@@ -408,6 +408,7 @@ class CameraService : Service(), Bot.Control {
 
     private fun onMotion(frame: ByteArray, share: Float) {
         statMotions++
+        bot.noteMotion()
         val now = SystemClock.elapsedRealtime()
         val name = fileTime.format(Date())
         FileLog.i("motion: ${"%.1f".format(share * 100)}% changed -> $name")

@@ -102,19 +102,24 @@ Phone check = `scripts/deploy.sh` (unlock phone, tap Install, Done) then the lis
 - [ ] **Step 6: Phone check:** `/testtemp 41` → Telegram "🌡️ Battery warm"; `/testtemp 51` → "🚨" + log `camera stopped` and no `camera started` for 3 min; after the override ends → log `camera started` + "✅ Battery temperature normal"
 - [ ] **Step 7: Commit** `feat: thermal states with heat pause (BatteryMonitor)`
 
-### Task 3: Alerts survive outages + offline summary
+### Task 3: Alerts survive outages + offline summary (+ fixes from the 2026-11-08 incidents)
 
-**Files:** Create `core/OutageTracker.kt` + test; Modify `Bot.kt`, `CameraService.kt` (`bot.noteMotion()` in `onMotion`)
+Evidence: 18:12 `/snapshot` photo upload failed with `EOFException` 3+ times and every text reply waited behind it until ~18:26; outages 20:18–22:59 and 23:48–03:29 made `/record off`, `/alerts off`, `/videos off` arrive ~80 min late and the 2-minute rule skipped them silently; 22 alert photos/videos were dropped after 8 tries.
+
+**Files:** Create `core/OutageTracker.kt`, `core/LateCommands.kt` + tests; Modify `Bot.kt`, `CameraService.kt` (`bot.noteMotion()` in `onMotion`)
 
 **Interfaces:**
 - Produces: `data class Outage(val startMs: Long, val endMs: Long, val motions: Int)`; `class OutageTracker(minOutageMs: Long = 60_000)` with `fun onFailure(nowMs: Long)`, `fun onSuccess(nowMs: Long): Outage?`, `fun noteMotion()`, `val offline: Boolean`
 - `Bot.sendPhoto` / `Bot.sendVideo` retry with `maxTries = Int.MAX_VALUE` (queue stays 20, DiscardOldest; log `telegram: queue full, dropped oldest`).
+- **Two send lanes:** `tg-text` (messages) and `tg-media` (photos, videos), each its own single thread and bounded queue, so a stuck upload never delays a text reply.
+- **Every failed try is logged** with its duration: `telegram: sending photo failed (try 4, 71 s): EOFException: null`.
+- `enum class LateAction { RUN, SKIP }`; `object LateCommands { val RUN_WHEN_LATE = setOf("/record", "/alerts", "/videos", "/status", "/help", "/start", "/log", "/last", "/reload"); fun action(name: String, ageS: Long, maxAgeS: Long = 120): LateAction }`. A skipped command gets the reply `"⏭ Skipped /snapshot: sent 80 min ago while I was offline."`; a late one that runs is logged `telegram: running late command '/record off' (4808s old)`.
 
-- [ ] **Step 1: Tests:** `shortBlipIsNotAnOutage` (fail at 0, success at 30 s → `null`); `outageReportedOnce` (fail 0, fail 70 s, success 90 s → `Outage(0, 90000, 0)`; next success → `null`); `motionsCountedOnlyWhileOffline` (2 motions online, fail, 3 motions, success after 2 min → `motions == 3`)
+- [ ] **Step 1: Tests:** `shortBlipIsNotAnOutage` (fail at 0, success at 30 s → `null`); `outageReportedOnce` (fail 0, fail 70 s, success 90 s → `Outage(0, 90000, 0)`; next success → `null`); `motionsCountedOnlyWhileOffline` (2 motions online, fail, 3 motions, success after 2 min → `motions == 3`); `freshCommandsRun` (any name, age 5 s → RUN); `lateSettingsRun` (`/record`, `/alerts`, `/videos` at 4808 s → RUN); `lateActionsSkipped` (`/snapshot`, `/clip`, `/sshd`, `/testkill`, `/testtemp` at 4808 s → SKIP); `boundaryIsInclusive` (`/clip` at exactly 120 s → RUN, 121 s → SKIP)
 - [ ] **Step 2: Run** → FAIL
 - [ ] **Step 3: Implement**; in `Bot.pollLoop` call `onFailure`/`onSuccess`; on an `Outage` send `"📴 Was offline HH:mm–HH:mm (N min), M motions while offline"`
 - [ ] **Step 4: Run** → pass
-- [ ] **Step 5: Phone check:** turn off home internet (router WAN or Wi-Fi off on router) for 3 min, walk past during it, restore → Telegram: the delayed alert photo arrives **and** "📴 Was offline … 1 motions while offline"; log has no `gave up sending`
+- [ ] **Step 5: Phone check:** turn off home internet (router WAN or Wi-Fi off on router) for 3 min, walk past during it, and send `/videos off` and `/snapshot` from mobile data during it; restore → Telegram: the delayed alert photo arrives, "📴 Was offline … 1 motions while offline", "Motion videos: OFF" (late setting applied), "⏭ Skipped /snapshot …"; log has no `gave up sending`. Then `/videos on`.
 - [ ] **Step 6: Commit** `feat: keep alerts through outages, offline summary`
 
 ### Task 4: Network diagnostics + IP in status

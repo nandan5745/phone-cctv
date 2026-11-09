@@ -1,6 +1,11 @@
 package com.nandan.cctv
 
+import com.nandan.cctv.core.LateAction
+import com.nandan.cctv.core.LateCommands
+import com.nandan.cctv.core.OutageTracker
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -36,7 +41,6 @@ class Bot(private val control: Control) {
 
     companion object {
         private const val POLL_TIMEOUT_S = 50
-        private const val MAX_SEND_TRIES = 8
         private const val MAX_COMMAND_AGE_S = 120
         const val HELP = "CCTV commands:\n" +
             "/snapshot – photo right now\n" +
@@ -61,13 +65,30 @@ class Bot(private val control: Control) {
     @Volatile private var poller: Thread? = null
     private var token = ""
 
-    // One sender thread; at most 20 waiting items, oldest dropped first if the
-    // network is down for a long time (keeps memory bounded).
-    private val sender = ThreadPoolExecutor(
+    // Two send lanes, each one thread with at most 20 waiting items (oldest dropped
+    // first, keeps memory bounded). Text has its own lane so a stuck photo/video upload
+    // can't delay replies (2026-11-08: a snapshot upload held /status back 14 min).
+    private val textLane = lane("tg-text")
+    private val mediaLane = lane("tg-media")
+
+    private fun lane(name: String) = ThreadPoolExecutor(
         1, 1, 0, TimeUnit.MILLISECONDS, LinkedBlockingQueue(20),
-        { r -> Thread(r, "tg-send").apply { isDaemon = true } },
-        ThreadPoolExecutor.DiscardOldestPolicy()
+        { r -> Thread(r, name).apply { isDaemon = true } },
+        { r, ex ->
+            if (!ex.isShutdown) {
+                ex.queue.poll()
+                FileLog.w("telegram: $name queue full, dropped oldest")
+                ex.execute(r)
+            }
+        }
     )
+
+    // Telegram unreachable: when, for how long, and motions missed meanwhile.
+    private val outage = OutageTracker()
+    private val clock = SimpleDateFormat("HH:mm", Locale.US)
+
+    /** Called by the camera on every motion event (counts the ones seen while offline). */
+    fun noteMotion() = synchronized(outage) { outage.noteMotion() }
 
     val enabled get() = api != null
 
@@ -92,44 +113,45 @@ class Bot(private val control: Control) {
     fun stop() {
         api = null
         poller?.interrupt()
-        sender.shutdownNow()
+        textLane.shutdownNow()
+        mediaLane.shutdownNow()
     }
 
     // ------------------------------------------------------------------ sending
 
-    fun send(text: String) = deliver("message") { a, chat -> a.sendMessage(chat, text) }
+    // Everything is retried until it gets through (outages lasted hours on 2026-11-08,
+    // and alerts were lost after 8 tries). Delays grow 5 s, 10 s, … up to 60 s.
 
-    /** Keeps retrying until it gets through (e.g. Wi-Fi still connecting after a reboot). */
-    fun sendWhenOnline(text: String) =
-        deliver("message", maxTries = Int.MAX_VALUE) { a, chat -> a.sendMessage(chat, text) }
+    fun send(text: String) = deliver(textLane, "message") { a, chat -> a.sendMessage(chat, text) }
 
     /** [jpeg] is the raw camera JPEG; it is rotated and time-stamped on the sender thread. */
     fun sendPhoto(jpeg: ByteArray, rotation: Int, label: String, caption: String) =
-        deliver("photo") { a, chat -> a.sendPhoto(chat, Photo.upright(jpeg, rotation, label), caption) }
+        deliver(mediaLane, "photo") { a, chat -> a.sendPhoto(chat, Photo.upright(jpeg, rotation, label), caption) }
 
     fun sendVideo(file: File, caption: String) =
-        deliver("video") { a, chat -> a.sendVideo(chat, file, caption) }
+        deliver(mediaLane, "video") { a, chat -> a.sendVideo(chat, file, caption) }
 
-    private fun deliver(what: String, maxTries: Int = MAX_SEND_TRIES, block: (TelegramApi, Long) -> Unit) {
-        if (api == null || sender.isShutdown) return
-        sender.execute {
+    private fun deliver(lane: ThreadPoolExecutor, what: String, block: (TelegramApi, Long) -> Unit) {
+        if (api == null || lane.isShutdown) return
+        lane.execute {
             var delay = 5_000L
             var attempt = 0
-            while (attempt < maxTries) {
+            while (true) {
                 attempt++
                 val a = api ?: return@execute
                 val chat = config?.telegramUserId ?: return@execute
+                val started = System.currentTimeMillis()
                 try {
                     block(a, chat)
+                    if (attempt > 1) FileLog.i("telegram: sent $what on try $attempt")
                     return@execute
                 } catch (e: Exception) {
-                    // Log the first tries, then only every 10th, so a long outage doesn't flood the log.
-                    if (attempt <= 3 || attempt % 10 == 0) FileLog.w("telegram: sending $what failed (try $attempt): ${a.safe(e)}")
+                    val secs = (System.currentTimeMillis() - started) / 1000
+                    FileLog.w("telegram: sending $what failed (try $attempt, ${secs} s): ${a.safe(e)}")
                 }
                 try { Thread.sleep(delay) } catch (e: InterruptedException) { return@execute }
                 delay = (delay * 2).coerceAtMost(60_000L)
             }
-            FileLog.e("telegram: gave up sending $what after $maxTries tries")
         }
     }
 
@@ -154,6 +176,12 @@ class Bot(private val control: Control) {
                     FileLog.i("telegram: reachable again after $failures failed tries")
                     failures = 0
                 }
+                synchronized(outage) { outage.onSuccess(System.currentTimeMillis()) }?.let { o ->
+                    val min = (o.endMs - o.startMs) / 60_000
+                    FileLog.i("telegram: outage ${clock.format(Date(o.startMs))}-${clock.format(Date(o.endMs))}, ${o.motions} motions")
+                    send("📴 Was offline ${clock.format(Date(o.startMs))}–${clock.format(Date(o.endMs))} ($min min), " +
+                        "${o.motions} motions while offline")
+                }
                 backoff = 2_000L
                 for (i in 0 until updates.length()) {
                     val u = updates.getJSONObject(i)
@@ -167,6 +195,7 @@ class Bot(private val control: Control) {
             } catch (e: InterruptedException) {
                 break
             } catch (e: Exception) {
+                synchronized(outage) { outage.onFailure(System.currentTimeMillis()) }
                 failures++
                 if (failures == 1 || failures % 30 == 0) FileLog.w("telegram: poll failed ($failures): ${a.safe(e)}")
                 try { Thread.sleep(backoff) } catch (ie: InterruptedException) { break }
@@ -184,15 +213,17 @@ class Bot(private val control: Control) {
             return
         }
         val text = msg.optString("text", "").trim()
-        val age = System.currentTimeMillis() / 1000 - msg.optLong("date")
-        if (age > MAX_COMMAND_AGE_S) {
-            // e.g. sent while the phone was off: running an old /clip later would be confusing
-            FileLog.i("telegram: skipped old command '$text' (${age}s old)")
-            return
-        }
-        FileLog.i("telegram: command '$text'")
         val parts = text.split(Regex("\\s+"))
         val cmd = parts[0].lowercase(Locale.US).substringBefore('@')
+        val age = System.currentTimeMillis() / 1000 - msg.optLong("date")
+        // Sent while the phone was offline? Settings still apply; "do it now" commands don't.
+        if (LateCommands.action(cmd, age, MAX_COMMAND_AGE_S.toLong()) == LateAction.SKIP) {
+            FileLog.i("telegram: skipped old command '$text' (${age}s old)")
+            send("⏭ Skipped $cmd: sent ${age / 60} min ago while I was offline.")
+            return
+        }
+        if (age > MAX_COMMAND_AGE_S) FileLog.i("telegram: running late command '$text' (${age}s old)")
+        else FileLog.i("telegram: command '$text'")
         val arg = parts.getOrNull(1)?.lowercase(Locale.US)
         when (cmd) {
             "/start", "/help" -> send(HELP)

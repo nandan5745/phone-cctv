@@ -155,15 +155,15 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 - [ ] **Step 5: Phone check:** (2026-11-11, 0.4.23: `/status` storage line and `/summary` confirmed by the owner; **follow-up (owner):** at the cap show `at cap: keeps about N days of history` instead of a stuck "0 days", `storageOutlook` + 3 tests; still open: the unprompted 09:00 summary on 2026-11-12) `/status` shows `Storage: 590 files (148 clips, 442 photos), 135/1200 MB, oldest 2026-11-06, ~N days left`; `/summary` returns the report; next day at 09:00 the summary arrives unprompted (evidence: Telegram message time)
 - [ ] **Step 6: Commit** `feat: storage dashboard and daily summary`
 
-### Task 6: Housekeeping + Phase 5 review
+### Task 6: Housekeeping + Phase 5 review ✅ (done 2026-11-11)
 
 **Files:** Modify `AndroidManifest.xml` (remove `QUICKBOOT_POWERON`)
 
 - [x] **Step 1:** Remove the action; push; CI green
 - [x] **Step 2: Phone:** `ssh phone 'am start -a android.intent.action.DELETE -d package:com.termux.boot'` → you tap OK; `pm list packages | grep termux` shows only `com.termux`
 - [x] **Step 3:** `/code-review medium` on the Phase 5 diff; fix findings (each fix = its own test + commit). 9 findings; owner approved fixing 1–6 test-first (SendPolicy, startPausedIfHot, summaryDue `!=`, isCommand, TestTemp, summary check before the battery read), cleanups 7–9 deferred (ledger).
-- [ ] **Step 4: Phone check:** reboot → "back online … phone rebooted" (proves the receiver still works without that action)
-- [ ] **Step 5: Commit** `chore: drop unprotected QUICKBOOT action`
+- [x] **Step 4: Phone check:** reboot → "back online … phone rebooted" (proves the receiver still works without that action). Done 2026-11-11 on 0.4.27, screen PIN set, phone left locked: `23:48:02 receiver: android.net.wifi.WIFI_STATE_CHANGED (uptime 0 min)`, `heat: cpu 62.245°C at start (resume below 55.0), starting paused`, `started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)`, `sent message on try 3`, `23:49:04 heat: cpu cooled to 47.307°C, resuming camera`, `camera started 640x480`
+- [x] **Step 5: Commit** `chore: drop unprotected QUICKBOOT action` (`dada715`) + `fix: Phase 5 review findings 1-6` (`0fb3e53`)
 
 ---
 

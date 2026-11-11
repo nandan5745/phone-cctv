@@ -1,3 +1,6 @@
+// MotionDetector.kt: core (no android.*): compares 80x60 grayscale grids of camera frames; used by CameraService.
+// Tests: MotionDetectorTest. Docs: docs/ARCHITECTURE.md §1.
+
 package com.nandan.cctv.core
 
 /**

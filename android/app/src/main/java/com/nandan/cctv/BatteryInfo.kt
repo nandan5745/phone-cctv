@@ -1,3 +1,6 @@
+// BatteryInfo.kt: Reads Android's sticky battery broadcast (%, status, plug, °C, mV, health) for CameraService.
+// The % and the temperature are unreliable on this phone: docs/PHONE.md, docs/INCIDENTS.md S4, S7.
+
 package com.nandan.cctv
 
 import android.content.Context

@@ -1,3 +1,6 @@
+// Termux.kt: Asks Termux (RUN_COMMAND) to run ~/.termux/boot/start-sshd; called by CameraService once
+// per boot and by /sshd. Needs allow-external-apps in Termux. Docs: docs/PHONE.md (Termux).
+
 package com.nandan.cctv
 
 import android.content.Context

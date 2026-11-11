@@ -1,3 +1,5 @@
+// LateCommandsTest.kt: JVM tests for core/LateCommands. Docs: docs/WORKFLOW.md §2.
+
 package com.nandan.cctv.core
 
 import org.junit.Assert.assertEquals

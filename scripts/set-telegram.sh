@@ -1,4 +1,5 @@
 #!/bin/sh
+# One-time setup; see docs/WORKFLOW.md §5.
 # Sets up the Telegram bot on the phone without the token ever being printed,
 # saved on the Mac, or committed. Usage: scripts/set-telegram.sh
 set -e

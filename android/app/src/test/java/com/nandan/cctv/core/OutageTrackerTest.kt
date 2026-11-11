@@ -1,3 +1,5 @@
+// OutageTrackerTest.kt: JVM tests for core/OutageTracker. Docs: docs/WORKFLOW.md §2.
+
 package com.nandan.cctv.core
 
 import org.junit.Assert.assertEquals

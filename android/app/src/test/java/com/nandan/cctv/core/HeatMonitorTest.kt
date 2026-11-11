@@ -1,3 +1,5 @@
+// HeatMonitorTest.kt: JVM tests for core/HeatMonitor (generic thresholds, not the app defaults). Docs: docs/WORKFLOW.md §2.
+
 package com.nandan.cctv.core
 
 import org.junit.Assert.assertEquals

@@ -1,3 +1,6 @@
+// FileLog.kt: App log at /sdcard/cctv/log.txt (rotated at 1 MB), tail() for /log. Every class logs here.
+// Log prefixes: docs/ARCHITECTURE.md §8.
+
 package com.nandan.cctv
 
 import android.os.Environment

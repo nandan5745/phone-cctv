@@ -1,3 +1,5 @@
+// BatteryMonitorTest.kt: JVM tests for core/BatteryMonitor. Docs: docs/WORKFLOW.md §2.
+
 package com.nandan.cctv.core
 
 import org.junit.Assert.assertEquals

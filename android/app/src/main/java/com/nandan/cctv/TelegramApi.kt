@@ -1,3 +1,6 @@
+// TelegramApi.kt: Minimal Telegram Bot API client on HttpURLConnection (no libraries); used only by Bot.
+// The token is in every URL, so errors go through safe(). Docs: docs/ARCHITECTURE.md §2.
+
 package com.nandan.cctv
 
 import org.json.JSONArray

@@ -1,3 +1,6 @@
+// Photo.kt: Rotates a camera JPEG upright and stamps the time on it; runs on the tg-media thread for
+// alert photos and /snapshot. Docs: docs/ARCHITECTURE.md §2.
+
 package com.nandan.cctv
 
 import android.graphics.Bitmap

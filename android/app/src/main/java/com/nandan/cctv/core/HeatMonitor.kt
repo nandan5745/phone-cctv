@@ -1,3 +1,7 @@
+// HeatMonitor.kt: core (no android.*): one temperature sensor's levels with hysteresis → warnings and camera
+// pause/resume. Used for the battery (via BatteryMonitor) and the CPU. Tests: HeatMonitorTest.
+// Docs: docs/ARCHITECTURE.md §4, docs/DECISIONS.md (CPU thresholds).
+
 package com.nandan.cctv.core
 
 /**

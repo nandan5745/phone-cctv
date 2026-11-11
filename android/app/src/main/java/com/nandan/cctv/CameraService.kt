@@ -1,3 +1,8 @@
+// CameraService.kt: Foreground service, the heart of the app: camera + motion (core/MotionDetector), clips
+// (MediaRecorder), storage, battery/CPU heat checks (core/BatteryMonitor, core/HeatMonitor),
+// watchdog, 1-minute restart alarm, and the handlers for Telegram commands (Bot.Control).
+// Docs: docs/ARCHITECTURE.md §1–§4; quirks: docs/INCIDENTS.md S1, S5–S7.
+
 @file:Suppress("DEPRECATION") // the old Camera API is deprecated, but it's the right choice for Android 5
 
 package com.nandan.cctv
@@ -63,7 +68,7 @@ class CameraService : Service(), Bot.Control {
         /** True while the service exists in this process (read by BootReceiver). */
         @Volatile var running = false
             private set
-        // 1 minute: the shortest repeat Android 5 allows. This phone does not restart a
+        // (docs/INCIDENTS.md S6) 1 minute: the shortest repeat Android 5 allows. This phone does not restart a
         // crashed service by itself (tested 2026-11-07), so this alarm is the only way back.
         private const val ALARM_EVERY_MS = 60_000L
 
@@ -119,7 +124,7 @@ class CameraService : Service(), Bot.Control {
     // Low %, low voltage (this phone's % is unreliable, voltage isn't), charging and
     // temperature warnings live in the tested core class.
     private lateinit var batteryMonitor: BatteryMonitor
-    // The battery reading follows the charger more than real heat (measured 2026-11-08),
+    // (docs/INCIDENTS.md S7) The battery reading follows the charger more than real heat (measured 2026-11-08),
     // so the processor sensor is watched too. The camera pauses while either is too hot.
     private lateinit var cpuHeat: HeatMonitor
     private val heatPausedBy = mutableSetOf<String>()
@@ -533,7 +538,7 @@ class CameraService : Service(), Bot.Control {
     /**
      * Take the camera back from MediaRecorder and restart motion detection.
      *
-     * On the LYF Flame, reconnect() + startPreview() on the same SurfaceTexture hangs ~6 s
+     * (docs/INCIDENTS.md S1) On the LYF Flame, reconnect() + startPreview() on the same SurfaceTexture hangs ~6 s
      * and then fails (log of 2026-11-06), while closing and reopening the camera takes
      * ~0.3 s. So we always reopen.
      */

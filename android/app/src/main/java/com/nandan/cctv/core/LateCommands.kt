@@ -1,3 +1,6 @@
+// LateCommands.kt: core (no android.*): which commands still run when they arrive late; used by Bot.
+// Tests: LateCommandsTest. Docs: docs/ARCHITECTURE.md §7, docs/INCIDENTS.md S9.
+
 package com.nandan.cctv.core
 
 enum class LateAction { RUN, SKIP }

@@ -1,3 +1,6 @@
+// CctvApp.kt: Application class: first code to run in the process. Logs the version and installs the
+// crash handler that writes CRASH lines to the log. Docs: docs/ARCHITECTURE.md §2.
+
 package com.nandan.cctv
 
 import android.app.Application

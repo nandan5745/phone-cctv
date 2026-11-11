@@ -1,3 +1,4 @@
+# CI: unit tests, then the signed APK (artifact cctv-apk). See docs/ARCHITECTURE.md §9.
 name: Build APK
 
 on:

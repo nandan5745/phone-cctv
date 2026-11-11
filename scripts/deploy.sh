@@ -1,4 +1,5 @@
 #!/bin/sh
+# Part of the deploy chain in docs/WORKFLOW.md §3 (CI artifact → phone → installer).
 # Download the newest APK built on GitHub and open the installer on the phone.
 # Usage: scripts/deploy.sh          (then tap "Install" on the phone)
 set -e

@@ -1,3 +1,5 @@
+// MotionDetectorTest.kt: JVM tests for core/MotionDetector (run by scripts/jvmtest.sh and CI). Docs: docs/WORKFLOW.md §2.
+
 package com.nandan.cctv.core
 
 import org.junit.Assert.assertEquals

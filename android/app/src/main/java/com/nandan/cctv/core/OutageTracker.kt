@@ -1,3 +1,6 @@
+// OutageTracker.kt: core (no android.*): start/end of Telegram outages and motions missed meanwhile; used by Bot
+// for the "Was offline" message. Tests: OutageTrackerTest. Docs: docs/INCIDENTS.md S10.
+
 package com.nandan.cctv.core
 
 /** A stretch of time Telegram couldn't be reached. Times are wall-clock milliseconds. */

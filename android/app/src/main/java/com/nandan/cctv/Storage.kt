@@ -1,3 +1,6 @@
+// Storage.kt: Clip folder housekeeping: size cap (oldest first), free space, broken-clip cleanup at start.
+// Used by CameraService. Docs: docs/ARCHITECTURE.md §5; MP4 check: docs/INCIDENTS.md S2.
+
 package com.nandan.cctv
 
 import android.os.StatFs
@@ -45,7 +48,7 @@ object Storage {
         if (deleted > 0) FileLog.i("startup cleanup: deleted $deleted broken files")
     }
 
-    /** True if the file has a "moov" box and its top-level boxes add up exactly to its size. */
+    /** (docs/INCIDENTS.md S2) True if the file has a "moov" box and its top-level boxes add up exactly to its size. */
     private fun isCompleteMp4(f: File): Boolean = try {
         RandomAccessFile(f, "r").use { raf ->
             val len = raf.length()

@@ -1,3 +1,6 @@
+// BatteryMonitor.kt: core (no android.*): battery warnings (heat via HeatMonitor, low %, low voltage, charging,
+// health). Used by CameraService every minute. Tests: BatteryMonitorTest. Docs: docs/INCIDENTS.md S3–S4.
+
 package com.nandan.cctv.core
 
 /** One battery reading. [health] is "good", "OVERHEAT", "DEAD", … or "unknown". */

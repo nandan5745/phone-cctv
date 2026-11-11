@@ -1,3 +1,6 @@
+// MainActivity.kt: The only screen. Opening it starts CameraService with ACTION_OPEN (first start or settings
+// reload). Docs: docs/ARCHITECTURE.md §4.
+
 package com.nandan.cctv
 
 import android.app.Activity

@@ -1,4 +1,5 @@
 #!/bin/sh
+# The local half of the test loop in docs/WORKFLOW.md §2.
 # Runs the JVM unit tests for the Android-free `core` package, on the Mac, in seconds.
 # Needs kotlinc (brew install kotlin) and Java. CI runs the same tests through Gradle.
 # Usage: scripts/jvmtest.sh            (exit code 0 = all passed)

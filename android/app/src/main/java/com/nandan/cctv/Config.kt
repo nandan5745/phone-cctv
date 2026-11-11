@@ -1,3 +1,6 @@
+// Config.kt: Settings: imports /sdcard/cctv/config.json into private storage (public copy deleted) and
+// parses it with defaults. Keys table: docs/ARCHITECTURE.md §6.
+
 package com.nandan.cctv
 
 import android.content.Context
@@ -38,7 +41,7 @@ class Config private constructor(j: JSONObject) {
      * Processor (sensor_arm) thresholds. Measured Nov 8–11 (3,861 minutes): normally 37–50 °C,
      * ~10% of minutes at ~50 °C, 51–54 °C only ~35 min in 3 days; 61.5–63 °C in direct sun
      * was already very hot. Resume at 55, not 50, so it doesn't flip warm/normal all day.
-     * (The battery reading follows the charger, see docs/INCIDENTS.md.)
+     * (The battery reading follows the charger, see docs/INCIDENTS.md S7.)
      */
     val cpuWarnC: Double = j.optDouble("cpuWarnC", 52.0)
     val cpuCriticalC: Double = j.optDouble("cpuCriticalC", 55.0)

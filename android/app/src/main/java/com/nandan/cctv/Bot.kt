@@ -1,3 +1,7 @@
+// Bot.kt: Telegram bot: tg-poll (long polling, commands), tg-text and tg-media send lanes with
+// retry-until-delivered, outage summary (core/OutageTracker), late commands (core/LateCommands).
+// Calls CameraService through Bot.Control. Docs: docs/ARCHITECTURE.md §3, §7; incidents S8–S10.
+
 package com.nandan.cctv
 
 import com.nandan.cctv.core.LateAction
@@ -65,7 +69,7 @@ class Bot(private val control: Control) {
     @Volatile private var poller: Thread? = null
     private var token = ""
 
-    // Two send lanes, each one thread with at most 20 waiting items (oldest dropped
+    // (docs/INCIDENTS.md S8) Two send lanes, each one thread with at most 20 waiting items (oldest dropped
     // first, keeps memory bounded). Text has its own lane so a stuck photo/video upload
     // can't delay replies (2026-11-08: a snapshot upload held /status back 14 min).
     private val textLane = lane("tg-text")
@@ -119,7 +123,7 @@ class Bot(private val control: Control) {
 
     // ------------------------------------------------------------------ sending
 
-    // Everything is retried until it gets through (outages lasted hours on 2026-11-08,
+    // (docs/INCIDENTS.md S10) Everything is retried until it gets through (outages lasted hours on 2026-11-08,
     // and alerts were lost after 8 tries). Delays grow 5 s, 10 s, … up to 60 s.
 
     fun send(text: String) = deliver(textLane, "message") { a, chat -> a.sendMessage(chat, text) }
@@ -216,7 +220,7 @@ class Bot(private val control: Control) {
         val parts = text.split(Regex("\\s+"))
         val cmd = parts[0].lowercase(Locale.US).substringBefore('@')
         val age = System.currentTimeMillis() / 1000 - msg.optLong("date")
-        // Sent while the phone was offline? Settings still apply; "do it now" commands don't.
+        // (docs/INCIDENTS.md S9) Sent while the phone was offline? Settings still apply; "do it now" commands don't.
         if (LateCommands.action(cmd, age, MAX_COMMAND_AGE_S.toLong()) == LateAction.SKIP) {
             FileLog.i("telegram: skipped old command '$text' (${age}s old)")
             send("⏭ Skipped $cmd: sent ${age / 60} min ago while I was offline.")

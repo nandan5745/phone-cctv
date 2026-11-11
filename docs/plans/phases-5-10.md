@@ -169,7 +169,7 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 ## Phase 6: Multiple users and roles
 
-### Task 7: Auth, Commands, RateLimiter (pure)
+### Task 7: Auth, Commands, RateLimiter (pure) ✅ (done 2026-11-11)
 
 **Files:** Create `core/Auth.kt`, `core/Commands.kt`, `core/RateLimiter.kt` + tests
 
@@ -179,12 +179,12 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 - `data class Command(val name: String, val arg: String?, val rest: String)`; `object Commands { val MEMBER = setOf("/start", "/help", "/snapshot", "/clip", "/last", "/status"); fun parse(text: String?): Command?; fun allowed(role: Role, name: String): Boolean }` (OWNER → everything; MEMBER → only `MEMBER`; so `/testkill`, `/teststop`, `/testtemp`, `/testcamera`, `/summary`, `/speak` are owner-only automatically)
 - `class RateLimiter(val max: Int, val windowMs: Long)`: `fun tryAcquire(key: Long, nowMs: Long): Boolean`
 
-- [ ] **Step 1: Tests:**
+- [x] **Step 1: Tests:**
   - Auth: `ownerHasRoleInPrivate`; `groupChatGetsNoRole` (owner in `"group"`/`"supergroup"`/`"channel"` → null); `unknownUserGetsNull`; `allowThenMember`; `revokeOwnerFails`; `jsonRoundTrip`; `corruptJsonFallsBackToOwnerOnly` (`"{oops"` → only owner, `roleOf(other)` null)
   - Commands: `parseStripsBotSuffixAndLowercases` (`"/Clip@cctv_bot 5"` → `Command("/clip", "5", "5")`); `parseKeepsRestForSpeak` (`"/speak hello there"` → `rest == "hello there"`); `parseReturnsNullForEmptyOrNonCommand` (`null`, `""`, `"hello"`); `memberCannotUseOwnerCommands` (`/record`, `/testkill`, `/teststop`, `/testtemp`, `/sshd`, `/allow`, `/speak` → false); `memberCanUseMemberCommands`
   - RateLimiter: `allowsUpToMaxInWindow` (max 10 / 60 s: 10 true, 11th false); `windowSlides` (after 60 s → true again); `keysIndependent`
-- [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** → pass
-- [ ] **Step 5: Commit** `feat: core auth, command parsing, rate limiter`
+- [x] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** → pass (72 tests; extras: `/summary` checked owner-only, `"/"` and `"  /status  "` parse cases, more corrupt-JSON shapes)
+- [x] **Step 5: Commit** `feat: core auth, command parsing, rate limiter`
 
 ### Task 8: Role-based routing in the bot
 

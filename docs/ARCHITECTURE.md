@@ -55,6 +55,9 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `OutageTracker.kt` | Start/end of Telegram outages (≥ 60 s), motions while offline, time offline so far. | `OutageTrackerTest` (4) |
 | `NetDiag.kt` | Phone IP from Android's little-endian int; likely outage cause (Wi-Fi down / login page / no internet / Telegram only). | `NetDiagTest` (6) |
 | `LateCommands.kt` | Which late commands still run (settings, read-only) and which are skipped; what counts as a command. | `LateCommandsTest` (6) |
+| `Auth.kt` | Owner + approved members, private chats only; JSON; corrupt JSON → owner only (wired in Task 8). | `AuthTest` (7) |
+| `Commands.kt` | Parse `/name@bot arg rest`; members may use only `/start /help /snapshot /clip /last /status`. | `CommandsTest` (5) |
+| `RateLimiter.kt` | At most N events per sliding window per user id. | `RateLimiterTest` (3) |
 | `SendPolicy.kt` | After a failed send: retry (network, 429, 5xx) or drop (other 4xx, missing file). | `SendPolicyTest` (5) |
 | `TestTemp.kt` | `/testtemp` argument parsing within each monitor's valid range. | `TestTempTest` (4) |
 | `StorageMath.kt` | MB/day from the last 3 complete days; days until the size cap starts deleting, or at the cap the days of history it holds (`storageOutlook`). | `StorageMathTest` (6) |

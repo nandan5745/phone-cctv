@@ -4,7 +4,7 @@
 
 ## Current task
 
-**Task 7** (Phase 6: Auth, Commands, RateLimiter, pure logic). Task 5 waits only for its 09:00 summary on 2026-11-12; Tasks 1–4 and 6 are closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
+**Task 8** (role-based routing in the bot; needs a second Telegram account). Task 7 done. Task 5 waits only for its 09:00 summary on 2026-11-12; Tasks 1–4 and 6 are closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
 
 ## Where we are
 
@@ -16,7 +16,9 @@
 | 4 Network diagnostics + IP in `/status` | ✅ done 2026-11-11 (IP phone-checked; outage cause untested until a real outage) |
 | 5 Storage dashboard + daily summary | 🔄 `/status` + `/summary` confirmed; waits for the unprompted 09:00 summary on 2026-11-12 |
 | 6 Housekeeping (drop `QUICKBOOT_POWERON`, uninstall Termux:Boot) + Phase 5 review | ✅ done 2026-11-11 (review fixes 1–6; PIN reboot passed) |
-| 7–22 (Phases 6–10) | ⏳ |
+| 7 Auth, Commands, RateLimiter (pure) | ✅ done 2026-11-11 |
+| 8 Role-based routing in the bot | ⏭ next |
+| 9–22 | ⏳ |
 
 Phases 1–4: done (see `docs/ROADMAP.md`). Per-feature test status: `docs/FEATURES.md`.
 
@@ -30,7 +32,7 @@ The owner can't cut the Wi-Fi, so the planned outage re-test can't be run.
 ## Exact next step
 
 1. **Task 5:** installed 0.4.23, then 0.4.24 (follow-up, started 23:23:50); `/status` storage line and `/summary` confirmed 2026-11-11. Follow-up pushed (at the cap: "keeps about N days of history"). **Remaining:** the summary must arrive by itself after 09:00 on 2026-11-12 (log `daily summary sent`). Then `task-done 5` with BASE `55c160c`, and Task 6.
-2. **Task 7** (`task-start docs/plans/phases-5-10.md 7`): TDD `core/Auth.kt`, `core/Commands.kt`, `core/RateLimiter.kt` (no phone check; Task 8 needs a second Telegram account).
+2. **Task 8** (`task-start docs/plans/phases-5-10.md 8`): wire Auth/Commands/RateLimiter into `Bot.kt` (Control methods take `chatId`), `users.json`, `/allow`, `/revoke`, `/users`. Phone check needs the owner's second Telegram account.
 
 ## Waiting on the owner
 

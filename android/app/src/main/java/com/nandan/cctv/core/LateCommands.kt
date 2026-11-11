@@ -11,7 +11,7 @@ enum class LateAction { RUN, SKIP }
  * act on the moment (photo, clip, SSH, tests) are skipped, and the user is told.
  */
 object LateCommands {
-    val RUN_WHEN_LATE = setOf("/record", "/alerts", "/videos", "/status", "/help", "/start", "/log", "/last", "/reload")
+    val RUN_WHEN_LATE = setOf("/record", "/alerts", "/videos", "/status", "/help", "/start", "/log", "/last", "/reload", "/summary")
 
     fun action(name: String, ageS: Long, maxAgeS: Long = 120): LateAction =
         if (ageS <= maxAgeS || name in RUN_WHEN_LATE) LateAction.RUN else LateAction.SKIP

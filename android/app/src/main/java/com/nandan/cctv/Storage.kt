@@ -1,5 +1,5 @@
 // Storage.kt: Clip folder housekeeping: size cap (oldest first), free space, broken-clip cleanup at start.
-// Used by CameraService. Docs: docs/ARCHITECTURE.md §5; MP4 check: docs/INCIDENTS.md S2.
+// Storage.summary() feeds /status and the daily summary. Used by CameraService. Docs: docs/ARCHITECTURE.md §5; MP4 check: docs/INCIDENTS.md S2.
 
 package com.nandan.cctv
 
@@ -17,6 +17,26 @@ object Storage {
     /** Files are named by time (YYYY-MM-DD_HH-MM-SS), so sorting by name = oldest first. */
     private fun clips(): List<File> =
         clipsDir.listFiles()?.filter { it.isFile }?.sortedBy { it.name } ?: emptyList()
+
+    /** Counts and sizes for the storage dashboard. Day = the YYYY-MM-DD at the start of each file name. */
+    data class StorageSummary(
+        val clips: Int, val photos: Int, val usedMb: Long,
+        val oldest: String?, val newest: String?, val sizesByDay: Map<String, Long>,
+    )
+
+    fun summary(): StorageSummary {
+        val files = clips()
+        val byDay = HashMap<String, Long>()
+        for (f in files) byDay[f.name.take(10)] = (byDay[f.name.take(10)] ?: 0L) + f.length()
+        return StorageSummary(
+            clips = files.count { it.name.endsWith(".mp4") },
+            photos = files.count { it.name.endsWith(".jpg") },
+            usedMb = files.sumOf { it.length() } / MB,
+            oldest = files.firstOrNull()?.name?.take(10),
+            newest = files.lastOrNull()?.name?.take(10),
+            sizesByDay = byDay,
+        )
+    }
 
     /** Returns (file count, total MB). */
     fun stats(): Pair<Int, Long> {

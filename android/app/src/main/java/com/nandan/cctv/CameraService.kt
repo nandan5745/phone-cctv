@@ -37,7 +37,10 @@ import com.nandan.cctv.core.BatteryEvent
 import com.nandan.cctv.core.BatteryMonitor
 import com.nandan.cctv.core.BatterySample
 import com.nandan.cctv.core.HeatMonitor
+import com.nandan.cctv.core.DailyStats
 import com.nandan.cctv.core.MotionDetector
+import com.nandan.cctv.core.mbPerDay
+import com.nandan.cctv.core.retentionDays
 import com.nandan.cctv.core.formatIpv4
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -45,6 +48,7 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Foreground service that keeps the back camera running (also with the screen off),
@@ -112,6 +116,8 @@ class CameraService : Service(), Bot.Control {
     @Volatile private var alertsOn = true
     @Volatile private var videosOn = true
     private var greeted = false
+    // Counters for the daily summary, saved in prefs "daily" (camera thread only).
+    private val daily by lazy { DailyStats.fromJson(prefs().getString("daily", null)) }
     private var lastVideoAt = -1L
 
     // Telegram requests and alerts (camera thread).
@@ -230,6 +236,7 @@ class CameraService : Service(), Bot.Control {
         if (!greeted) {
             greeted = true
             FileLog.i("started: $reason")
+            cam.post { daily.restarts++; saveDaily() }
             val version = packageManager.getPackageInfo(packageName, 0).versionName
             // Built when it goes out: right after a boot Wi-Fi often has no address yet.
             bot.sendFresh { "🟢 CCTV back online (v$version)\n" +
@@ -416,6 +423,7 @@ class CameraService : Service(), Bot.Control {
 
     private fun onMotion(frame: ByteArray, share: Float) {
         statMotions++
+        daily.motions++
         bot.noteMotion()
         val now = SystemClock.elapsedRealtime()
         val name = fileTime.format(Date())
@@ -436,6 +444,7 @@ class CameraService : Service(), Bot.Control {
         val cooldownMs = config.alertCooldownSeconds * 1000L
         if (alertsOn && jpeg != null && (lastAlertAt < 0 || now - lastAlertAt >= cooldownMs)) {
             lastAlertAt = now
+            daily.alerts++
             val label = labelTime.format(Date())
             bot.sendPhoto(jpeg, rotation, label, "🚨 Motion at $label (${"%.0f".format(share * 100)}% of view changed)")
         }
@@ -517,6 +526,7 @@ class CameraService : Service(), Bot.Control {
             if (ok && f.length() > 10_000) {
                 recordFailures = 0
                 statClips++
+                daily.clips++
                 FileLog.i("clip saved ${f.name} ${f.length() / 1024} KB ${secs}s")
                 if (sendClipWhenDone) bot.sendVideo(f, "🎥 ${f.nameWithoutExtension} (${secs}s)")
             } else {
@@ -671,6 +681,8 @@ class CameraService : Service(), Bot.Control {
             FileLog.w("testtemp: fake ${if (testTempCpu) "cpu" else "battery"} ${testTempC}°C (${testTempChecksLeft} checks left)")
         }
         FileLog.i("battery: ${b.text()} | cpu ${cpuC?.let { "%.1f".format(it) } ?: "?"}°C")
+        cpuTempC()?.let { daily.noteTemp(it) } // the real reading, not a /testtemp fake
+        sendDailySummaryIfDue()
 
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         if (today != maxTempDay) { maxTempDay = today; batteryMonitor.resetMax(); cpuHeat.resetMax() }
@@ -712,18 +724,50 @@ class CameraService : Service(), Bot.Control {
     private fun statusText(): String {
         val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val mi = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
-        val (count, mb) = Storage.stats()
         return "📊 CCTV status\n" +
             "Up: ${duration(SystemClock.elapsedRealtime() - serviceStartedAt)} (phone up ${duration(SystemClock.elapsedRealtime())})\n" +
             "Battery: ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
             "Temp: battery ${BatteryInfo.read(this)?.let { "%.1f".format(it.tempC) } ?: "?"} °C (max today ${"%.1f".format(batteryMonitor.maxTempC)}), " +
             "CPU ${cpuTempC()?.let { "%.1f".format(it) } ?: "?"} °C (max today ${"%.1f".format(cpuHeat.maxC)})\n" +
-            "Storage: $count files, $mb MB of ${config.storageCapMB} MB cap, ${Storage.freeMB()} MB free\n" +
+            "${storageText()}\n" +
             "Recording: ${onOff(recordOn)}${if (photoOnly) " (photo-only fallback)" else ""}, alerts: ${onOff(alertsOn)}, videos: ${onOff(videosOn)}\n" +
             "RAM free: ${mi.availMem / 1_048_576} MB of ${mi.totalMem / 1_048_576} MB\n" +
             "Wi-Fi: ${wifiText()}\n" +
             "Camera: ${if (heatPaused) "PAUSED (too hot)" else if (camera != null || recorder != null) "${width}x$height" else "NOT RUNNING"}${if (recorder != null) ", recording now" else ""}"
     }
+
+    /** "Storage: 819 files (300 clips, 519 photos), 295/1200 MB, oldest 2026-11-06, ~N days until the cap, disk free …" */
+    private fun storageText(): String {
+        val s = Storage.summary()
+        val today = DailyStats.day(System.currentTimeMillis(), TimeZone.getDefault())
+        val days = retentionDays(s.usedMb, config.storageCapMB, mbPerDay(s.sizesByDay, today))
+        val left = when {
+            days == null -> "rate not known yet"
+            days < 0.5 -> "at the cap, oldest deleted first"
+            else -> "~${"%.0f".format(days)} days until the cap (then oldest deleted)"
+        }
+        return "Storage: ${s.clips + s.photos} files (${s.clips} clips, ${s.photos} photos), " +
+            "${s.usedMb}/${config.storageCapMB} MB, oldest ${s.oldest ?: "-"}, $left; disk free ${Storage.freeMB()} MB"
+    }
+
+    private fun saveDaily() = prefs().edit().putString("daily", daily.toJson()).apply()
+
+    /** Called every minute from the battery check (camera thread). */
+    private fun sendDailySummaryIfDue() {
+        val now = System.currentTimeMillis()
+        val tz = TimeZone.getDefault()
+        if (DailyStats.summaryDue(now, config.dailySummaryHour, prefs().getString("dailySentDay", null), tz)) {
+            bot.send(daily.summaryText(storageText()))
+            FileLog.i("daily summary sent")
+            daily.reset()
+            prefs().edit().putString("dailySentDay", DailyStats.day(now, tz)).apply()
+        }
+        saveDaily()
+    }
+
+    override fun summary() { cam.post { bot.send(daily.summaryText(storageText())) } }
+
+    override fun noteOffline(minutes: Long) { cam.post { daily.offlineMin += minutes; saveDaily() } }
 
     private fun wifiInfo() = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo
 

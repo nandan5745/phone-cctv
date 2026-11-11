@@ -73,6 +73,11 @@ Format: **decision** (date): why · rejected alternatives · cost if wrong.
 | 3 | Plan amended (owner OK): two lanes, late settings applied, every try logged | — |
 | 3 | Text also retries until delivered | stale reply arrives late |
 | 3 (close, 11-11) | **Closed "done, partly untested"** (owner): the owner can't cut the Wi-Fi, so retry-until-delivered across a long outage, late settings applied, late actions skipped with a reply and the two lanes under a stuck upload stay unproven on the phone; unit tests + the next natural outage cover them (INCIDENTS S15) | an alert or a late `/record off` misbehaves during a real outage and is only found then |
+| 5 | `retentionDays` = days until the cap starts deleting ((cap − used) ÷ rate, ≥ 0): the plan's expected 6.0 is right, its "= cap ÷ rate" comment is a typo | status shows "days until the cap", not "days of footage kept" |
+| 5 | `mbPerDay` takes `today` (the incomplete day is left out); days with no files are skipped, not counted as 0 | estimate a bit short after days with recording off (conservative) |
+| 5 | `summaryDue` / `day` live in `DailyStats`' companion (no state used); first summary goes out at the first check after 09:00 even right after install | one early summary |
+| 5 | `/summary` added to the late-runnable read-only commands (+ test `lateReadOnlyRun`) | none |
+| 5 | Daily max temperature = real CPU reading (not battery, not a `/testtemp` fake); `/status` "max today" (midnight reset) left as it is | two different "max" numbers |
 | 4 (pre-start, 11-11) | Outage cause enum gains `TELEGRAM_DOWN` (probe 204 = internet fine, Telegram not) | one more case to test |
 
 ## Rejected tools

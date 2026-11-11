@@ -54,7 +54,9 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `BatteryMonitor.kt` | Battery warnings: temperature (via a HeatMonitor), low %, low voltage, charging stopped/resumed, health change. | `BatteryMonitorTest` (10) |
 | `OutageTracker.kt` | Start/end of Telegram outages (≥ 60 s), motions while offline, time offline so far. | `OutageTrackerTest` (4) |
 | `NetDiag.kt` | Phone IP from Android's little-endian int; likely outage cause (Wi-Fi down / login page / no internet / Telegram only). | `NetDiagTest` (6) |
-| `LateCommands.kt` | Which late commands still run (settings, read-only) and which are skipped. | `LateCommandsTest` (4) |
+| `LateCommands.kt` | Which late commands still run (settings, read-only) and which are skipped. | `LateCommandsTest` (5) |
+| `StorageMath.kt` | MB/day from the last 3 complete days; days until the size cap starts deleting. | `StorageMathTest` (3) |
+| `DailyStats.kt` | Daily-summary counters (motions, clips, alerts, restarts, offline min, max CPU °C), JSON in prefs, when the summary is due. | `DailyStatsTest` (3) |
 
 ### Other files
 
@@ -101,7 +103,7 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `clips/YYYY-MM-DD_HH-MM-SS.mp4` | The clip (~2.3 MB per 20 s). |
 | `config.json` | Only briefly: dropped there, then moved to app-private storage. |
 
-App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the token), shared prefs `state` (record/alerts/videos switches, `sshdBootMin`).
+App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the token), shared prefs `state` (record/alerts/videos switches, `sshdBootMin`, `daily` = DailyStats JSON, `dailySentDay`).
 
 ## 6. Config keys (`config.json`, all optional)
 
@@ -119,6 +121,7 @@ App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the t
 | `minFreeMB` | 300 | Don't record below this much free space. |
 | `tempWarnC` / `tempCriticalC` / `tempEmergencyC` / `tempResumeC` | 40 / 45 / 50 / 42 | Battery temperature levels (°C). |
 | `cpuWarnC` / `cpuCriticalC` / `cpuEmergencyC` / `cpuResumeC` | 52 / 55 / 60 / 55 | Processor (`sensor_arm`) levels (°C), measured 2026-11-11. |
+| `dailySummaryHour` | 9 | Hour (0–23, phone time) for the daily summary. |
 
 How the levels move (HeatMonitor, hysteresis 2 °C): a level is entered as soon as its threshold is reached; it is left only below an exit point. CPU: WARNING exits below 50, CRITICAL below 53, EMERGENCY below 55 (= resume; the camera restarts and the state drops to CRITICAL if the reading is 53–54.9, without a new message). Battery: exits below 38 / 43 / 42. Messages: on every rise, "❄️ … camera back on" when leaving EMERGENCY, "✅ … normal" on reaching NORMAL.
 
@@ -140,6 +143,7 @@ Today only `telegramUserId` (the owner) gets any answer. Phase 6 adds members.
 | `/videos on\|off` | Also send the motion clip | owner | yes |
 | `/log` | Last 30 log lines | owner | yes |
 | `/reload` | Re-read settings | owner | yes |
+| `/summary` | Counts since the last daily summary + storage line (no reset) | owner | yes |
 | `/sshd` | Ask Termux to start sshd | owner | no |
 | `/testkill` | Crash the app on purpose | owner | no |
 | `/teststop` | Stop the service (alarm restarts it) | owner | no |
@@ -156,6 +160,7 @@ Today only `telegramUserId` (the owner) gets any answer. Phase 6 adds members.
 | `motion: N% changed -> <name>` | Motion event. |
 | `clip saved <name> <KB> <s>` | Clip finished. |
 | `status:` | 10-minute summary. |
+| `daily summary sent` | The daily summary went out (counters reset). |
 | `battery: … \| cpu N°C` | 1-minute battery and CPU reading. |
 | `heat:` | Camera paused/resumed for temperature. |
 | `testtemp:` / `testkill:` / `teststop:` | Test commands. |

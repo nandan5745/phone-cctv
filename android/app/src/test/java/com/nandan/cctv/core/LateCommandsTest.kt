@@ -17,6 +17,11 @@ class LateCommandsTest {
     }
 
     @Test
+    fun lateReadOnlyRun() {
+        for (c in listOf("/status", "/summary", "/last", "/log")) assertEquals(c, LateAction.RUN, LateCommands.action(c, 4808))
+    }
+
+    @Test
     fun lateActionsSkipped() {
         for (c in listOf("/snapshot", "/clip", "/sshd", "/testkill", "/testtemp")) assertEquals(c, LateAction.SKIP, LateCommands.action(c, 4808))
     }

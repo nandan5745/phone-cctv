@@ -14,7 +14,7 @@
 | 2 Battery + CPU heat levels, heat pause | ✅ done 2026-11-08 · follow-up (CPU 52/55/60, resume 55) ✅ phone-checked 2026-11-11 |
 | 3 Alerts survive outages, two send lanes, late commands, offline summary | ✅ done 2026-11-11, **partly untested** (accepted risk) |
 | 4 Network diagnostics + IP in `/status` | ✅ done 2026-11-11 (IP phone-checked; outage cause untested until a real outage) |
-| 5 Storage dashboard + daily summary | 🔄 current |
+| 5 Storage dashboard + daily summary | 🔄 code pushed, phone check pending |
 | 6 Housekeeping (drop `QUICKBOOT_POWERON`, uninstall Termux:Boot) + Phase 5 review | ⏳ |
 | 7–22 (Phases 6–10) | ⏳ |
 
@@ -29,7 +29,7 @@ The owner can't cut the Wi-Fi, so the planned outage re-test can't be run.
 
 ## Exact next step
 
-1. **Task 5** (`task-start docs/plans/phases-5-10.md 5`, docs/WORKFLOW.md §1): TDD `core/StorageMath.kt` and `core/DailyStats.kt` (Step 1 tests in the plan).
+1. **Task 5:** code pushed (StorageMath, DailyStats, `/summary`, storage line in `/status`; 41 tests). Install; phone check: `/status` shows `Storage: N files (C clips, P photos), used/1200 MB, oldest …, ~D days until the cap`; `/summary` replies; tomorrow 09:00 the summary arrives unprompted (log `daily summary sent`). Then `task-done 5` with BASE `55c160c`.
 2. When the owner has set a screen PIN (secure start-up "No"): one reboot test without unlocking; quote the `started: phone rebooted (first signal: …)` line in docs/FEATURES.md and docs/PHONE.md.
 
 ## Waiting on the owner

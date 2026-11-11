@@ -88,7 +88,7 @@ Telegram token + owner ID: `scripts/set-telegram.sh` (asks for the token hidden,
 - Unlocking the phone for every install.
 - Walking past the camera; covering it; the IR remote test.
 - A second Telegram account (Phase 6 tests).
-- Cutting the router/internet (outage tests).
+- Outage tests: the owner can't cut the Wi-Fi/internet (2026-11-11); outage paths are checked on natural outages.
 - Anything using the GitHub account beyond pushing to `main` (secrets, settings, releases): ask first.
 - Physical checks (battery swelling, phone settings).
 

@@ -48,12 +48,15 @@ class Config private constructor(j: JSONObject) {
     val cpuEmergencyC: Double = j.optDouble("cpuEmergencyC", 60.0)
     val cpuResumeC: Double = j.optDouble("cpuResumeC", 55.0)
 
+    /** Hour of the day (0–23, phone time) when the daily summary is sent. */
+    val dailySummaryHour: Int = j.optInt("dailySummaryHour", 9).coerceIn(0, 23)
+
     /** For the log. Never includes the bot token itself. */
     override fun toString() =
         "pixelDiff=$motionPixelDiff threshold=$motionThreshold frames=$motionFrames fps=$analyzeFps " +
             "clip=${clipSeconds}s cap=${storageCapMB}MB minFree=${minFreeMB}MB cooldown=${alertCooldownSeconds}s " +
             "temp=$tempWarnC/$tempCriticalC/$tempEmergencyC/$tempResumeC°C cpu=$cpuWarnC/$cpuCriticalC/$cpuEmergencyC/$cpuResumeC°C " +
-            "telegram=${if (telegramBotToken.isNotEmpty() && telegramUserId != 0L) "set" else "not set"}"
+            "summary=${dailySummaryHour}h telegram=${if (telegramBotToken.isNotEmpty() && telegramUserId != 0L) "set" else "not set"}"
 
     companion object {
         fun load(ctx: Context): Config {

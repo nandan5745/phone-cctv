@@ -48,6 +48,10 @@ class Bot(private val control: Control) {
         fun testTemp(celsius: Double, cpu: Boolean)
         /** True if the phone is joined to a Wi-Fi network and has an address. */
         fun wifiConnected(): Boolean
+        /** Send the daily summary now (counters are not reset). */
+        fun summary()
+        /** An outage of [minutes] just ended (for the daily summary). */
+        fun noteOffline(minutes: Long)
     }
 
     companion object {
@@ -65,6 +69,7 @@ class Bot(private val control: Control) {
             "/last – send the most recent saved clip\n" +
             "/log – last 30 log lines\n" +
             "/sshd – start SSH on the phone (Termux)\n" +
+            "/summary – counts since the last daily summary, storage\n" +
             "/reload – re-read settings\n" +
             "/help – this list\n\n" +
             "Testing only:\n" +
@@ -198,6 +203,7 @@ class Bot(private val control: Control) {
                 outageCause = null
                 synchronized(outage) { outage.onSuccess(System.currentTimeMillis()) }?.let { o ->
                     val min = (o.endMs - o.startMs) / 60_000
+                    control.noteOffline(min)
                     FileLog.i("telegram: outage ${clock.format(Date(o.startMs))}-${clock.format(Date(o.endMs))}, ${o.motions} motions" +
                         (cause?.let { ", cause: $it" } ?: ""))
                     send("📴 Was offline ${clock.format(Date(o.startMs))}–${clock.format(Date(o.endMs))} ($min min" +
@@ -304,6 +310,7 @@ class Bot(private val control: Control) {
             }
             "/log" -> send(FileLog.tail(30))
             "/reload" -> control.reload()
+            "/summary" -> control.summary()
             else -> send("Unknown command. Send /help")
         }
     }

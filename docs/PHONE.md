@@ -65,6 +65,7 @@ Only two temperature sensors exist. No gyroscope, compass or barometer.
 |---|---|
 | Normal, indoors | 37–50 °C; ~10% of minutes at ~50 °C; 51–54 °C only ~35 min in 3 days (3,861 minutes logged Nov 8–11) |
 | Direct sun | 61.5–63 °C, already "very hot" [2026-11-09 14:20, owner's test] |
+| Right after boot | 63.8 °C, back to ~47 °C within a minute [2026-11-11 23:37] (INCIDENTS S17) |
 | App thresholds | warn 52, critical 55, emergency 60 (camera paused), resume below 55 |
 
 ## Wi-Fi and network
@@ -95,7 +96,7 @@ Only two temperature sensors exist. No gyroscope, compass or barometer.
 | SSH | `sshd`, key login only; started at boot by the app via RUN_COMMAND |
 | `allow-external-apps = true` | Set in `~/.termux/termux.properties` (owner approved) so the app can run `start-sshd` |
 | `~/.termux/boot/start-sshd` | `termux-wake-lock` + `sshd` (run by the app) |
-| Termux:Boot | Installed but useless (boot broadcast blocked); removal is Task 6 |
+| Termux:Boot | Uninstalled 2026-11-11 (Task 6). Side effect: Termux lost `/sdcard` write access until the next reboot (INCIDENTS S18) |
 | Termux:API | **Impossible**: every release v0.43–v0.53 needs Android 7 (minSdk 24) |
 | Text to speech | Pico TTS is installed (`com.svox.pico`), usable natively (Phase 9) |
 
@@ -108,6 +109,6 @@ Only two temperature sensors exist. No gyroscope, compass or barometer.
 | Bluetooth | Off (owner checked 2026-11-11) |
 | Location | Off (owner checked 2026-11-11) |
 | NFC | Not present on this phone |
-| Screen lock PIN | **Not set yet** (2026-11-11); owner will add one with "Secure start-up: No" so the phone boots without the PIN. After that: one reboot test without unlocking, expecting `started: phone rebooted (first signal: …)` |
+| Screen lock PIN | **Set** 2026-11-11, secure start-up "No". Reboot left locked (23:37): `receiver: android.net.wifi.WIFI_STATE_CHANGED (uptime 0 min) -> starting service`, `termux: asked to run start-sshd`, `started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)`, `camera started 640x480`, `sent message on try 3`; SSH worked |
 | Mobile data | To verify (Task 11) |
 | Unused preinstalled apps disabled | To do |

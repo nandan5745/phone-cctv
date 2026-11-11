@@ -194,6 +194,14 @@ class CameraService : Service(), Bot.Control {
         cpuZone = File("/sys/class/thermal").listFiles()
             ?.firstOrNull { File(it, "type").let { t -> t.canRead() && t.readText().trim() == "sensor_arm" } }
         FileLog.i("cpu temperature sensor: ${cpuZone?.name ?: "not found"}")
+        // Restarted while paused for heat, or the CPU spike right after boot (63.8 °C, 2026-11-11):
+        // stay paused until the usual resume line instead of starting hot.
+        cpuTempC()?.let {
+            if (cpuHeat.startPausedIfHot(it)) {
+                heatPausedBy += "cpu"
+                FileLog.w("heat: cpu ${it}°C at start (resume below ${config.cpuResumeC}), starting paused")
+            }
+        }
         Storage.clipsDir.mkdirs()
         Storage.deleteBrokenClips()
         prefs().let {
@@ -671,6 +679,8 @@ class CameraService : Service(), Bot.Control {
     }
 
     private fun checkBattery() {
+        cpuTempC()?.let { daily.noteTemp(it) } // the real reading, not a /testtemp fake
+        sendDailySummaryIfDue() // neither needs the battery reading below
         val b = BatteryInfo.read(this) ?: return
         val now = SystemClock.elapsedRealtime()
         var tempC = b.tempC
@@ -681,8 +691,6 @@ class CameraService : Service(), Bot.Control {
             FileLog.w("testtemp: fake ${if (testTempCpu) "cpu" else "battery"} ${testTempC}°C (${testTempChecksLeft} checks left)")
         }
         FileLog.i("battery: ${b.text()} | cpu ${cpuC?.let { "%.1f".format(it) } ?: "?"}°C")
-        cpuTempC()?.let { daily.noteTemp(it) } // the real reading, not a /testtemp fake
-        sendDailySummaryIfDue()
 
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         if (today != maxTempDay) { maxTempDay = today; batteryMonitor.resetMax(); cpuHeat.resetMax() }

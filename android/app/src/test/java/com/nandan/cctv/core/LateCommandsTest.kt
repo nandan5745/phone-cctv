@@ -3,6 +3,8 @@
 package com.nandan.cctv.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LateCommandsTest {
@@ -30,5 +32,11 @@ class LateCommandsTest {
     fun boundaryIsInclusive() {
         assertEquals(LateAction.RUN, LateCommands.action("/clip", 120))
         assertEquals(LateAction.SKIP, LateCommands.action("/clip", 121))
+    }
+
+    @Test
+    fun onlySlashWordsAreCommands() {
+        assertTrue(LateCommands.isCommand("/status"))
+        for (t in listOf("", "/", "hi", "status")) assertFalse(t, LateCommands.isCommand(t))
     }
 }

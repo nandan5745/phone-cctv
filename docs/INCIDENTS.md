@@ -87,3 +87,17 @@ Each entry: symptom, evidence, root cause, fix, commit, status. Newest open ones
 - **Seen on the phone:** Telegram HTTP 502 blip `2026-11-09 18:22:53 poll failed (1): … HTTP 502 Bad Gateway` → `18:25:20 reachable again after 4 failed tries` → `outage 18:22-18:25, 0 motions`; the 2026-11-11 outage `14:09:55 poll failed (1): SSLException … Connection timed out` → `17:51:01 reachable again after 225 failed tries` → `outage 14:09-17:51, 3 motions` (matches the 3 `motion:` lines at 14:46:05, 17:49:20, 17:50:11); short retries `sent message on try 3` (2026-11-10 10:55), `[tg-media] sent video on try 2` (2026-11-11 18:27).
 - **Not seen:** an alert held through a long outage and delivered after it (alerts were OFF), a late settings command applied (`running late command`), a late action skipped with a reply (new-style `skipped old command` + "⏭ Skipped …"), a stuck upload not delaying text (two lanes, S8).
 - **Why:** the owner can't cut the Wi-Fi for a test. Accepted risk (docs/DECISIONS.md); the paths are unit-tested (`OutageTrackerTest`, `LateCommandsTest`) and the next natural outage is the test. Commit `47824b0`.
+
+### S16. One unsendable item could block a send lane forever (found in review, 2026-11-11)
+- **Finding:** `/code-review` of Phase 5: "retry until delivered" (S10) also retried errors that can never succeed. Example: an alert video queued during an outage whose clip the storage cap deletes first, or a Telegram 400/403. That item would retry every 60 s forever and hold up every later alert in its lane. Not seen on the phone.
+- **Fix:** `core/SendPolicy`: retry network errors, 429 and 5xx; drop other 4xx and missing files with `telegram: dropped <what>: …`. Tests `SendPolicyTest` (5). Task 6.
+
+### S17. CPU heat alert on every boot (2026-11-11)
+- **Evidence:** reboot 23:37: `heat: cpu 63.818°C, pausing camera` 0.3 s after `camera started`, `23:38:03 heat: cpu cooled to 47.307°C, resuming camera`. The processor is briefly very hot while the phone boots, so every reboot sent "🚨 Phone CPU … camera stopped".
+- **Fix:** at service start the CPU is read once; at or above the resume line (55 °C) the camera starts paused without a message and resumes with the usual "❄️ … camera back on" (`HeatMonitor.startPausedIfHot`). Also keeps the camera paused after a crash/restart during a heat pause (review finding). Task 6.
+
+### S18. Uninstalling Termux:Boot took Termux's /sdcard write access until a reboot (2026-11-11)
+- **Evidence:** 23:34, right after the uninstall: `scp: dest open "/sdcard/Download/cctv.apk": Permission denied`; `touch` in `/sdcard/Download` and `/sdcard/cctv` denied, though `id` still listed `sdcard_rw`. The CCTV app kept writing its log. After the 23:37 reboot: write OK.
+- **Cause (likely):** Termux:Boot shares Termux's user ID; removing it changed that shared ID's storage access for the running processes. Unproven (no root).
+- **Fix:** reboot. If it ever recurs without a reboot: `termux-setup-storage` on the phone.
+

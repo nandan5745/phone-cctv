@@ -21,6 +21,9 @@ import java.net.URLEncoder
  * The token is part of every URL, so URLs are never logged, and error messages go
  * through [safe] which removes the token.
  */
+/** Telegram answered with an error status ([code]); the message never contains the token. */
+class TelegramHttpException(val code: Int, message: String) : IOException(message)
+
 class TelegramApi(private val token: String) {
 
     fun getMe(): JSONObject = postForm("getMe", emptyMap(), 20_000).getJSONObject("result")
@@ -118,7 +121,7 @@ class TelegramApi(private val token: String) {
         val text = (if (code < 400) c.inputStream else c.errorStream)?.let { readAll(it) } ?: ""
         val json = try { JSONObject(text) } catch (e: Exception) { JSONObject() }
         if (!json.optBoolean("ok")) {
-            throw IOException("Telegram $method failed: HTTP $code ${json.optString("description")}")
+            throw TelegramHttpException(code, "Telegram $method failed: HTTP $code ${json.optString("description")}")
         }
         return json
     }

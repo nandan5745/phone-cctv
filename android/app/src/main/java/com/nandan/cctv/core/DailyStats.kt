@@ -60,12 +60,13 @@ class DailyStats {
             SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = tz }.format(Date(nowMs))
 
         /**
-         * Due once per day at or after [hour]:00. Never twice on the same day, and not when the
-         * clock is behind the day it was last sent (a clock that jumped back after a reboot).
+         * Due once per day at or after [hour]:00: never twice on the same date. Only "same date"
+         * blocks it, so a clock that was wrongly ahead when it last sent can't stop summaries until
+         * that future date (a clock jumping back costs one extra summary instead).
          */
         fun summaryDue(nowMs: Long, hour: Int, lastSentDay: String?, tz: TimeZone): Boolean {
             val today = day(nowMs, tz)
-            if (lastSentDay != null && today <= lastSentDay) return false
+            if (today == lastSentDay) return false
             val h = SimpleDateFormat("H", Locale.US).apply { timeZone = tz }.format(Date(nowMs)).toInt()
             return h >= hour
         }

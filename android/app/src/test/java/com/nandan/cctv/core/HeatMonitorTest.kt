@@ -3,6 +3,7 @@
 package com.nandan.cctv.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -46,5 +47,22 @@ class HeatMonitorTest {
         assertEquals(61.5, m.maxC, 0.0)
         m.resetMax(); m.update(54.0)
         assertEquals(54.0, m.maxC, 0.0)
+    }
+
+    @Test
+    fun startsPausedWhenAtOrAboveResume() {
+        val m = HeatMonitor("Phone CPU", 52.0, 55.0, 60.0, 55.0, maxValidC = 150.0)
+        assertTrue(m.startPausedIfHot(57.0))
+        assertEquals(TempState.EMERGENCY, m.state)
+        assertTrue(m.update(58.0).isEmpty())                       // already paused: no new alert
+        assertTrue(m.update(54.0).contains(BatteryEvent.ResumeAfterHeat))
+    }
+
+    @Test
+    fun startsNormalBelowResumeOrInvalid() {
+        val m = HeatMonitor("Phone CPU", 52.0, 55.0, 60.0, 55.0, maxValidC = 150.0)
+        assertFalse(m.startPausedIfHot(54.9))
+        assertFalse(m.startPausedIfHot(0.0))
+        assertEquals(TempState.NORMAL, m.state)
     }
 }

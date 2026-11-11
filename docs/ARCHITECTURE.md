@@ -50,13 +50,15 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | File | What it does | Tests |
 |---|---|---|
 | `MotionDetector.kt` | 80x60 grid diff with brightness normalisation; `lastMean` for darkness detection (Task 15). | `MotionDetectorTest` (5) |
-| `HeatMonitor.kt` | One sensor's temperature levels with hysteresis → Notify / PauseForHeat / ResumeAfterHeat. | `HeatMonitorTest` (5) |
+| `HeatMonitor.kt` | One sensor's temperature levels with hysteresis → Notify / PauseForHeat / ResumeAfterHeat; `startPausedIfHot` at service start. | `HeatMonitorTest` (7) |
 | `BatteryMonitor.kt` | Battery warnings: temperature (via a HeatMonitor), low %, low voltage, charging stopped/resumed, health change. | `BatteryMonitorTest` (10) |
 | `OutageTracker.kt` | Start/end of Telegram outages (≥ 60 s), motions while offline, time offline so far. | `OutageTrackerTest` (4) |
 | `NetDiag.kt` | Phone IP from Android's little-endian int; likely outage cause (Wi-Fi down / login page / no internet / Telegram only). | `NetDiagTest` (6) |
-| `LateCommands.kt` | Which late commands still run (settings, read-only) and which are skipped. | `LateCommandsTest` (5) |
+| `LateCommands.kt` | Which late commands still run (settings, read-only) and which are skipped; what counts as a command. | `LateCommandsTest` (6) |
+| `SendPolicy.kt` | After a failed send: retry (network, 429, 5xx) or drop (other 4xx, missing file). | `SendPolicyTest` (5) |
+| `TestTemp.kt` | `/testtemp` argument parsing within each monitor's valid range. | `TestTempTest` (4) |
 | `StorageMath.kt` | MB/day from the last 3 complete days; days until the size cap starts deleting, or at the cap the days of history it holds (`storageOutlook`). | `StorageMathTest` (6) |
-| `DailyStats.kt` | Daily-summary counters (motions, clips, alerts, restarts, offline min, max CPU °C), JSON in prefs, when the summary is due. | `DailyStatsTest` (3) |
+| `DailyStats.kt` | Daily-summary counters (motions, clips, alerts, restarts, offline min, max CPU °C), JSON in prefs, when the summary is due. | `DailyStatsTest` (4) |
 
 ### Other files
 
@@ -90,7 +92,7 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | Service/process dies | Android's START_STICKY restart doesn't happen on this phone. A **1-minute AlarmManager** check starts the service if it isn't running. |
 | First start after each boot | Asks Termux to run `start-sshd` (wake lock + sshd). Phase 7 changes this to on-demand. |
 | Every start | "🟢 CCTV back online (vX) Why: … Wi-Fi: <network>, IP <address> …" sent, retried until Telegram is reachable; the text is built when it goes out, so the IP is current. |
-| Too hot | A HeatMonitor reaches EMERGENCY → recording stopped, camera closed, watchdog won't restart it; resumes when every sensor is below its resume point. |
+| Too hot | A HeatMonitor reaches EMERGENCY → recording stopped, camera closed, watchdog won't restart it; resumes when every sensor is below its resume point. At service start the CPU is read once: at or above its resume line the camera starts paused (no message). |
 | Clip finished | Camera released and reopened (~0.3 s), 1.5 s warm-up, detection resumes. |
 
 ## 5. Storage on the phone (`/sdcard/cctv/`)
@@ -162,10 +164,11 @@ Today only `telegramUserId` (the owner) gets any answer. Phase 6 adds members.
 | `status:` | 10-minute summary. |
 | `daily summary sent` | The daily summary went out (counters reset). |
 | `battery: … \| cpu N°C` | 1-minute battery and CPU reading. |
-| `heat:` | Camera paused/resumed for temperature. |
+| `heat:` | Camera paused/resumed for temperature; `heat: cpu N°C at start …, starting paused`. |
 | `testtemp:` / `testkill:` / `teststop:` | Test commands. |
 | `telegram: command '…'` / `running late command` / `skipped old command` | Commands received. |
-| `telegram: sending X failed (try N, S s)` / `sent X on try N` | Send retries. |
+| `telegram: sending X failed (try N, S s)` / `sent X on try N` / `dropped X: …` | Send retries; a send that can't succeed is dropped. |
+| `telegram: ignored old non-command message` | Plain chat text that arrived late (no reply). |
 | `telegram: poll failed (N)` / `reachable again after N` / `outage HH:mm-HH:mm, N motions[, cause: …]` | Connection loss and recovery. |
 | `net: outage cause: … (wifi …, check page …)` / `net: check page failed: <error>` | After 2 min offline, one check of Wi-Fi + `http://connectivitycheck.gstatic.com/generate_204` (204 = internet fine, other code = login page, no answer = no internet; the error tells DNS from timeout). |
 | `telegram: tg-text/tg-media queue full, dropped oldest` | Send queue overflow. |

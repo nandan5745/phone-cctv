@@ -28,6 +28,18 @@ class HeatMonitor(
         maxC = 0.0
     }
 
+    /**
+     * At service start: if the sensor is already at or above the resume line, start in EMERGENCY
+     * (camera paused) without a message; the usual "cooled" event resumes it. Covers a restart
+     * while paused for heat, and the CPU spike right after boot. Returns true if paused.
+     */
+    fun startPausedIfHot(t: Double): Boolean {
+        if (t <= 0.0 || t > maxValidC || t < resumeC) return false
+        state = TempState.EMERGENCY
+        if (t > maxC) maxC = t
+        return true
+    }
+
     fun update(t: Double): List<BatteryEvent> {
         if (t <= 0.0 || t > maxValidC) return emptyList()
         if (t > maxC) maxC = t

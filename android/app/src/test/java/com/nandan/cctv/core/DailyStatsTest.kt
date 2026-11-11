@@ -21,8 +21,14 @@ class DailyStatsTest {
         assertTrue(DailyStats.summaryDue(at("2026-11-12 09:00"), 9, "2026-11-11", tz))
         assertFalse(DailyStats.summaryDue(at("2026-11-12 09:01"), 9, "2026-11-12", tz))  // already sent today
         assertFalse(DailyStats.summaryDue(at("2026-11-12 08:59"), 9, "2026-11-11", tz))  // too early
-        assertFalse(DailyStats.summaryDue(at("2026-11-11 10:00"), 9, "2026-11-12", tz))  // clock jumped back
+        assertTrue(DailyStats.summaryDue(at("2026-11-11 10:00"), 9, "2026-11-12", tz))   // clock jumped back: one extra, not none
         assertTrue(DailyStats.summaryDue(at("2026-11-12 09:00"), 9, null, tz))           // never sent
+    }
+
+    @Test
+    fun clockAheadDoesNotBlockLaterSummaries() {
+        // Sent once while the clock was wrongly in 2027: once it is right again, summaries continue.
+        assertTrue(DailyStats.summaryDue(at("2026-11-12 09:00"), 9, "2027-01-05", tz))
     }
 
     @Test

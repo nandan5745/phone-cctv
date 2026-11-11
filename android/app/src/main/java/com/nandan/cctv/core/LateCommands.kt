@@ -13,6 +13,9 @@ enum class LateAction { RUN, SKIP }
 object LateCommands {
     val RUN_WHEN_LATE = setOf("/record", "/alerts", "/videos", "/status", "/help", "/start", "/log", "/last", "/reload", "/summary")
 
+    /** "/status" is a command; "", "/" and plain words are not. */
+    fun isCommand(name: String) = name.length > 1 && name.startsWith("/")
+
     fun action(name: String, ageS: Long, maxAgeS: Long = 120): LateAction =
         if (ageS <= maxAgeS || name in RUN_WHEN_LATE) LateAction.RUN else LateAction.SKIP
 }

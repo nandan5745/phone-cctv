@@ -78,6 +78,11 @@ Format: **decision** (date): why · rejected alternatives · cost if wrong.
 | 5 | `summaryDue` / `day` live in `DailyStats`' companion (no state used); first summary goes out at the first check after 09:00 even right after install | one early summary |
 | 5 | `/summary` added to the late-runnable read-only commands (+ test `lateReadOnlyRun`) | none |
 | 5 | Daily max temperature = real CPU reading (not battery, not a `/testtemp` fake); `/status` "max today" (midnight reset) left as it is | two different "max" numbers |
+| 6 (review, owner-approved) | Retry policy: network/429/5xx retry, other 4xx + missing file dropped (S16) | a 4xx that would have worked later is lost (logged) |
+| 6 (review, owner) | Heat pause not persisted: CPU read once at start, ≥ resume line → start paused silently (S17) | battery-only heat pause not restored after a restart (battery sensor follows the charger anyway) |
+| 6 (review, owner) | Daily summary due when not yet sent *today* (`!=`), replacing `today > lastSent` | a clock jumping back sends one extra summary (Review Focus #4 traded: never "skipped forever") |
+| 6 (review) | Old non-command messages ignored without a reply; `/testtemp` battery 1–100, CPU 1–150; daily summary checked even without a battery reading | none |
+| 6 | Fixes 1–6 in one commit (each with its own tests), not one commit each: the fixes share Bot.kt/CameraService.kt hunks and interactive staging isn't available | coarser history |
 | 4 (pre-start, 11-11) | Outage cause enum gains `TELEGRAM_DOWN` (probe 204 = internet fine, Telegram not) | one more case to test |
 
 ## Rejected tools

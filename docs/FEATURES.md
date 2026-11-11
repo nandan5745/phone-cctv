@@ -45,12 +45,12 @@ Every feature and command so far (Phases 1–5). **Tested on phone?** yes = seen
 
 | Feature | How it works (1 line) | Tested on phone? | Evidence | Notes |
 |---|---|---|---|---|
-| Start after reboot | `BootReceiver` on Wi-Fi/network/charger/unlock/storage events (`BOOT_COMPLETED` is blocked) | yes | 2026-11-07 01:12:21 and 2026-11-10 10:55:18 `started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)` | Reboot with a screen PIN: test pending (docs/STATUS.md) |
+| Start after reboot | `BootReceiver` on Wi-Fi/network/charger/unlock/storage events (`BOOT_COMPLETED` is blocked) | yes | 2026-11-07 01:12:21 and 2026-11-10 10:55:18 `started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)` | With the screen PIN set and the phone left locked: 2026-11-11 23:37:04 `started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)` + 23:37:05 `camera started 640x480` |
 | Restart after an update | `MY_PACKAGE_REPLACED` | yes | 2026-11-07 01:09:40 `receiver: android.intent.action.MY_PACKAGE_REPLACED (uptime 20 min) -> starting service` | |
 | 1-minute watchdog | AlarmManager restarts the service if it isn't running | yes | 2026-11-07 00:45:10 `started: 1-minute check found the service stopped` | START_STICKY doesn't work here (S6) |
 | `/teststop` | Stops the service to test the watchdog | yes | 2026-11-07 00:44:21 `teststop: stopping service` → 00:45:10 restarted | Screen on and off |
 | `/testkill` | Kills the process to test recovery | yes | 2026-11-07 00:33:13 `testkill: killing own process` → 00:37:52 `5-minute check found the service stopped` | Not re-run since the check became 1 minute |
-| sshd at boot | First start per boot asks Termux (RUN_COMMAND) to run `start-sshd` | yes | 2026-11-10 10:55:17 `termux: asked to run start-sshd (first start since boot) -> sent` + SSH works | Becomes on-demand in Phase 7 |
+| sshd at boot | First start per boot asks Termux (RUN_COMMAND) to run `start-sshd` | yes | 2026-11-10 10:55:17 `termux: asked to run start-sshd (first start since boot) -> sent` + SSH works | Also works with the PIN set and the phone locked (2026-11-11 23:37:04). Becomes on-demand in Phase 7 |
 
 ## Safety and operations (Phase 5, Tasks 1–3)
 
@@ -59,9 +59,9 @@ Every feature and command so far (Phases 1–5). **Tested on phone?** yes = seen
 | JVM unit tests | `core` tested with `scripts/jvmtest.sh` and in CI | n/a | `OK (27 tests)` | Not a phone feature |
 | Battery heat levels + camera pause | HeatMonitor 40/45/50 °C, resume < 42; EMERGENCY stops the camera | yes | 2026-11-08 16:17:30 `heat: battery 51.0°C, pausing camera` → 16:19:51 `heat: battery cooled to 28.2°C, resuming camera` | Battery sensor follows the charger (S7) |
 | CPU heat levels + camera pause | `sensor_arm`, 52/55/60 °C, resume < 55 | yes | 2026-11-11 22:49:36 `heat: cpu 61.0°C, pausing camera` + `camera stopped` → 22:51:48 `heat: cpu cooled to 41.017°C, resuming camera` + `camera started` | Config line: 2026-11-11 22:47:47 `cpu=52.0/55.0/60.0/55.0°C` |
-| `/testtemp C`, `/testtemp cpu C` | Fakes a reading for 3 checks | yes | 2026-11-11 22:49:36 `testtemp: fake cpu 61.0°C (2 checks left)` | |
+| `/testtemp C`, `/testtemp cpu C` | Fakes a reading for 3 checks (battery 1–100 °C, CPU 1–150 °C) | yes | 2026-11-11 22:49:36 `testtemp: fake cpu 61.0°C (2 checks left)` | |
 | Outage detection + offline summary | OutageTracker; "📴 Was offline HH:mm–HH:mm (N min), M motions while offline" | yes | 2026-11-11 17:51:01 `outage 14:09-17:51, 3 motions` (3 `motion:` lines in that window); 2026-11-09 18:25:20 `outage 18:22-18:25, 0 motions` (Telegram HTTP 502) | Outages under 60 s aren't reported |
-| Retry until delivered | Every send retries (5 s → 60 s backoff) until sent; queues of 20, oldest dropped | partly | 2026-11-10 10:55:28 `sent message on try 3`; 2026-11-11 18:27:22 `sent video on try 2` | **Untested: I can't cut Wi-Fi.** An alert held through a long outage was never seen (alerts were off on Nov 11) |
+| Retry until delivered | Network errors, 429 and 5xx retry (5 s → 60 s backoff) until sent; other 4xx and missing files are dropped with a log line (S16); queues of 20, oldest dropped | partly | 2026-11-10 10:55:28 `sent message on try 3`; 2026-11-11 18:27:22 `sent video on try 2` | **Untested: I can't cut Wi-Fi.** An alert held through a long outage was never seen (alerts were off on Nov 11) |
 | Two send lanes | `tg-text` and `tg-media` threads, so a stuck upload can't delay replies | partly | Both lanes log (`[tg-text]`, `[tg-media]`) | **Untested: I can't cut Wi-Fi.** Not seen under a stuck upload (S8) |
 | Outage cause | After 2 min offline: Wi-Fi state + a `generate_204` check page → Wi-Fi down / login page / no internet / Telegram only; added to the offline summary | no | — | **Untested until a real outage** (Task 4, 0.4.21). Look for `net: outage cause: …` and `outage …, cause: …`; or switch the phone's own Wi-Fi off for 3+ min (expect "Wi-Fi not connected") |
 | IP and network name in `/status` and back-online | `Wi-Fi: <network>, IP <address>, -77 dBm (3/4)` | yes | 2026-11-11 22:57:33 `started: app updated` (0.4.21) + owner saw `Wi-Fi: <network>, IP …` in back-online and `/status` (Telegram) | Text built at send time, so a fresh boot shows the IP once Wi-Fi has one |

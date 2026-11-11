@@ -9,6 +9,9 @@ import com.nandan.cctv.core.LateAction
 import com.nandan.cctv.core.LateCommands
 import com.nandan.cctv.core.OutageCause
 import com.nandan.cctv.core.OutageTracker
+import com.nandan.cctv.core.SendOutcome
+import com.nandan.cctv.core.TestTemp
+import com.nandan.cctv.core.afterSendFailure
 import com.nandan.cctv.core.classify
 import java.io.File
 import java.net.HttpURLConnection
@@ -152,9 +155,9 @@ class Bot(private val control: Control) {
         deliver(mediaLane, "photo") { a, chat -> a.sendPhoto(chat, Photo.upright(jpeg, rotation, label), caption) }
 
     fun sendVideo(file: File, caption: String) =
-        deliver(mediaLane, "video") { a, chat -> a.sendVideo(chat, file, caption) }
+        deliver(mediaLane, "video", file) { a, chat -> a.sendVideo(chat, file, caption) }
 
-    private fun deliver(lane: ThreadPoolExecutor, what: String, block: (TelegramApi, Long) -> Unit) {
+    private fun deliver(lane: ThreadPoolExecutor, what: String, file: File? = null, block: (TelegramApi, Long) -> Unit) {
         if (api == null || lane.isShutdown) return
         lane.execute {
             var delay = 5_000L
@@ -171,6 +174,12 @@ class Bot(private val control: Control) {
                 } catch (e: Exception) {
                     val secs = (System.currentTimeMillis() - started) / 1000
                     FileLog.w("telegram: sending $what failed (try $attempt, ${secs} s): ${a.safe(e)}")
+                    // (docs/INCIDENTS.md S16) An error that can never succeed would block the lane forever.
+                    val missing = file != null && !file.exists()
+                    if (afterSendFailure((e as? TelegramHttpException)?.code, missing) == SendOutcome.DROP) {
+                        FileLog.w("telegram: dropped $what: ${if (missing) "file no longer exists" else "rejected by Telegram"}")
+                        return@execute
+                    }
                 }
                 try { Thread.sleep(delay) } catch (e: InterruptedException) { return@execute }
                 delay = (delay * 2).coerceAtMost(60_000L)
@@ -274,6 +283,10 @@ class Bot(private val control: Control) {
         val parts = text.split(Regex("\\s+"))
         val cmd = parts[0].lowercase(Locale.US).substringBefore('@')
         val age = System.currentTimeMillis() / 1000 - msg.optLong("date")
+        if (!LateCommands.isCommand(cmd) && age > MAX_COMMAND_AGE_S) {
+            FileLog.i("telegram: ignored old non-command message (${age}s old)") // no "⏭ Skipped" reply for chat text
+            return
+        }
         // (docs/INCIDENTS.md S9) Sent while the phone was offline? Settings still apply; "do it now" commands don't.
         if (LateCommands.action(cmd, age, MAX_COMMAND_AGE_S.toLong()) == LateAction.SKIP) {
             FileLog.i("telegram: skipped old command '$text' (${age}s old)")
@@ -303,10 +316,9 @@ class Bot(private val control: Control) {
             "/testkill" -> { send("Killing the app now. Expect a 'back online' message."); control.testKill() }
             "/teststop" -> { send("Stopping the service. The 1-minute check should restart it."); control.testStop() }
             "/testtemp" -> {
-                val cpu = arg == "cpu"
-                val c = (if (cpu) parts.getOrNull(2) else arg)?.toDoubleOrNull()
-                if (c == null || c !in 1.0..150.0) send("Usage: /testtemp 51   or   /testtemp cpu 61")
-                else { send("Pretending the ${if (cpu) "processor" else "battery"} is $c °C for 3 minutes."); control.testTemp(c, cpu) }
+                val t = TestTemp.parse(arg, parts.getOrNull(2))
+                if (t == null) send("Usage: /testtemp 51 (battery, 1–100)   or   /testtemp cpu 61 (processor, 1–150)")
+                else { send("Pretending the ${if (t.cpu) "processor" else "battery"} is ${t.celsius} °C for 3 minutes."); control.testTemp(t.celsius, t.cpu) }
             }
             "/log" -> send(FileLog.tail(30))
             "/reload" -> control.reload()

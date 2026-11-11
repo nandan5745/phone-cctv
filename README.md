@@ -1,76 +1,36 @@
 # phone-cctv
 
-A small Android app that turns an old Android 5.1 phone into a motion camera.
-Plain Kotlin and Android framework APIs only (no AndroidX), built on GitHub Actions.
+Turns a 10-year-old Android 5.1 phone (ARMv7, ~470 MB RAM) into a self-healing motion camera
+you control from Telegram. Plain Kotlin and Android framework APIs only (no AndroidX), built
+and signed on GitHub Actions, installed over SSH (the phone's USB is charge-only).
 
-## Status
+**What it does:** watches the back camera with the screen off; on motion it saves a photo and a
+20 s clip, sends a Telegram alert (and optionally the clip); answers commands like `/snapshot`,
+`/clip 10`, `/status`; warns about heat, low battery voltage and charging problems; survives
+reboots, updates, crashes and network outages. It opens no ports: only outgoing HTTPS to Telegram.
 
-- Phase 1 (done): foreground service keeps the back camera running with the screen off.
-- Phase 2: motion detection, a 20 s clip per motion event in `/sdcard/cctv/clips/`
-  (`YYYY-MM-DD_HH-MM-SS.mp4` plus a `.jpg` of the moment motion was seen), and a size cap
-  (oldest deleted first). Clips cut off by a crash or power loss are deleted at startup.
-  `/sdcard/cctv/test.jpg` is refreshed every 60 s to check the view.
-- Phase 3: Telegram bot (long polling, no open ports). Photo alert on motion (at most one
-  per `alertCooldownSeconds`), commands `/snapshot`, `/clip N`, `/status`, `/record on|off`,
-  `/alerts on|off`, `/log`, `/reload`, `/help`. Warnings when the battery is below 30%, stops
-  charging, or drops while plugged in; a "back online" message when the app starts.
-  Only `telegramUserId` gets answers. Battery is logged every minute.
-  `/videos on|off` also sends the motion clip after the photo (same cooldown); `/last` sends
-  the newest clip.
-- Phase 4: starts by itself after a reboot and after an app update; a 1-minute alarm restarts
-  the service if it died; "back online" (with the reason) is retried until the network is up.
-  This phone (low-RAM mode) never delivers BOOT_COMPLETED to apps, so the app also wakes on
-  Wi-Fi/network/charger/unlock events. On its first start after each boot it asks Termux
-  (RUN_COMMAND, needs `allow-external-apps = true`) to run `~/.termux/boot/start-sshd`;
-  `/sshd` does the same on demand.
+## Documentation
 
-## Settings
-
-Optional. Put `/sdcard/cctv/config.json` on the phone, unlock it and open the CCTV app (that
-reloads settings). The app moves the file into its private storage and deletes the `/sdcard` copy.
-Missing keys use these defaults:
-
-```json
-{
-  "telegramBotToken": "123456:ABC...",
-  "telegramUserId": 123456789,
-  "alertCooldownSeconds": 120,
-  "motionPixelDiff": 25,
-  "motionThreshold": 0.02,
-  "motionFrames": 2,
-  "analyzeFps": 2,
-  "clipSeconds": 20,
-  "storageCapMB": 1200,
-  "minFreeMB": 300
-}
-```
-
-Every 10 minutes the log prints a `status:` line with the biggest change seen
-(`max change`), plus battery %, charging state and temperature. In an empty room that number should stay well below `motionThreshold`.
-
-## Build
-
-Every push to `main` builds a signed APK (artifact `cctv-apk`). Signing needs two repo secrets:
-
-| Secret | Value |
+| Read | For |
 |---|---|
-| `CCTV_KEYSTORE_BASE64` | the keystore file, base64 encoded |
-| `CCTV_KEYSTORE_PASSWORD` | its password (key alias is `cctv`) |
+| [docs/STATUS.md](docs/STATUS.md) | Where the project is right now and the next step |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | The plan for Phases 5–10 and phase status |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it works: pipeline, files, threads, config, commands, logs |
+| [docs/PHONE.md](docs/PHONE.md) | Measured facts and quirks of this phone |
+| [docs/INCIDENTS.md](docs/INCIDENTS.md) | Bugs and incidents, with evidence and fixes |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Why things are the way they are |
+| [docs/WORKFLOW.md](docs/WORKFLOW.md) | Tests, build, deploy, logs, settings |
+| [docs/plans/phases-5-10.md](docs/plans/phases-5-10.md) | Step-by-step task list |
 
-Keep a backup of the keystore. Losing it means the next APK won't install over the old
-app (you'd have to uninstall first).
-
-## Install on the phone (no USB)
-
-```sh
-scripts/deploy.sh   # downloads the latest APK, copies it over SSH, opens the installer
-```
-Unlock the phone when the script asks (the installer only shows on an unlocked phone), then tap **Install**, and open the **CCTV** app once to start the service.
-
-## Debug
+## Quick start
 
 ```sh
+scripts/jvmtest.sh           # unit tests for the core logic (needs kotlinc)
+git push                     # CI runs the tests and builds the signed APK
+scripts/deploy.sh            # copy the APK to the phone and open the installer (unlock the phone)
+scripts/set-telegram.sh      # one-time: bot token + your Telegram ID onto the phone
 ssh phone 'tail -f /sdcard/cctv/log.txt'
-ssh phone 'ls -l /sdcard/cctv/'
-scp phone:/sdcard/cctv/test.jpg .
 ```
+
+Signing needs two repo secrets, `CCTV_KEYSTORE_BASE64` and `CCTV_KEYSTORE_PASSWORD` (key alias
+`cctv`). Keep a backup of the keystore: without it, the next APK won't install over the old app.

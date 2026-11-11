@@ -48,7 +48,7 @@ Phone check = `scripts/deploy.sh` (unlock phone, tap Install, Done) then the lis
 
 ## Phase 5: Safety and operations
 
-### Task 1: Test infrastructure + MotionDetector tests
+### Task 1: Test infrastructure + MotionDetector tests ✅ (2026-11-08)
 
 **Files:**
 - Move: `…/cctv/MotionDetector.kt` → `…/cctv/core/MotionDetector.kt` (package `com.nandan.cctv.core`; update import in `CameraService.kt`)
@@ -59,18 +59,18 @@ Phone check = `scripts/deploy.sh` (unlock phone, tap Install, Done) then the lis
 **Interfaces:**
 - Produces: `core` package convention; `MotionDetector.changedShare(nv21: ByteArray, width: Int, height: Int, pixelDiff: Int): Float` unchanged; new read-only `val lastMean: Int` (mean luma of the last frame, used by Task 15).
 
-- [ ] **Step 1: Write tests** (`MotionDetectorTest`, frames built by a helper `frame(w=640, h=480, fill: (x, y) -> Int): ByteArray`, Y plane only + zeroed UV)
+- [x] **Step 1: Write tests** (`MotionDetectorTest`, frames built by a helper `frame(w=640, h=480, fill: (x, y) -> Int): ByteArray`, Y plane only + zeroed UV)
   - `firstFrameReturnsMinusOne`: first call → `-1f`
   - `identicalFramesGiveZero`: two equal frames → `0f`
   - `uniformBrightnessShiftIgnored`: second frame = first + 40 everywhere → `0f`
   - `blockChangeCounted`: 160×120 px block (= 20×15 cells) changes by +100 → share `== 300f/4800 ± 0.01`
   - `lastMeanReported`: frame filled with 77 → `lastMean == 77`
-- [ ] **Step 2: Run** `scripts/jvmtest.sh` → `lastMeanReported` FAILS (unresolved reference), others pass (existing behaviour)
-- [ ] **Step 3: Add `lastMean`**; write `scripts/jvmtest.sh`: `kotlinc` compiles `core/*.kt` + `src/test/**/*.kt` with `junit-4.13.2.jar`, `hamcrest-core-1.3.jar`, `json-20231013.jar` (cached in `~/.cache/cctv-test/`, downloaded from Maven Central on first run) and runs `org.junit.runner.JUnitCore` on every `*Test` class; exits non-zero on failure
-- [ ] **Step 4: Run** `scripts/jvmtest.sh` → `OK (5 tests)`; push; `gh run watch` → green, log shows `testReleaseUnitTest`
-- [ ] **Step 5: Commit** `test: core package, JVM test runner, MotionDetector tests`
+- [x] **Step 2: Run** `scripts/jvmtest.sh` → `lastMeanReported` FAILS (unresolved reference), others pass (existing behaviour)
+- [x] **Step 3: Add `lastMean`**; write `scripts/jvmtest.sh`: `kotlinc` compiles `core/*.kt` + `src/test/**/*.kt` with `junit-4.13.2.jar`, `hamcrest-core-1.3.jar`, `json-20231013.jar` (cached in `~/.cache/cctv-test/`, downloaded from Maven Central on first run) and runs `org.junit.runner.JUnitCore` on every `*Test` class; exits non-zero on failure
+- [x] **Step 4: Run** `scripts/jvmtest.sh` → `OK (5 tests)`; push; `gh run watch` → green, log shows `testReleaseUnitTest`
+- [x] **Step 5: Commit** `test: core package, JVM test runner, MotionDetector tests`
 
-### Task 2: BatteryMonitor (thermal + existing battery warnings)
+### Task 2: BatteryMonitor (thermal + existing battery warnings) ✅ (2026-11-08; CPU follow-up phone check pending)
 
 **Files:**
 - Create: `core/BatteryMonitor.kt`, `test/.../core/BatteryMonitorTest.kt`
@@ -84,7 +84,7 @@ Phone check = `scripts/deploy.sh` (unlock phone, tap Install, Done) then the lis
   - `class BatteryMonitor(warnC: Double = 40.0, criticalC: Double = 45.0, emergencyC: Double = 50.0, resumeC: Double = 42.0, hysteresisC: Double = 2.0, lowPct: Int = 30, lowVoltageMv: Int = 3600)` with `fun update(s: BatterySample): List<BatteryEvent>`, `val tempState: TempState`, `val maxTempC: Double`, `fun resetMax()`
 - Consumes: `BatteryInfo` (Android) → mapped to `BatterySample` in `CameraService`.
 
-- [ ] **Step 1: Write tests**
+- [x] **Step 1: Write tests**
   - `warningAt40`: 39.9 → no event; 40.0 → one `Notify` whose text starts with `"🌡️ Battery warm"`, state WARNING
   - `noRepeatWhileWarm`: three samples at 41 → exactly one Notify total
   - `hysteresisOnCooling`: WARNING then 39.0 → still WARNING, no Notify; 37.9 → Notify starting `"✅ Battery temperature normal"`
@@ -95,18 +95,18 @@ Phone check = `scripts/deploy.sh` (unlock phone, tap Install, Done) then the lis
   - `chargingStoppedAndResumed`: charging true→false → Notify `"⚠️ Phone is not charging"`; false→true → `"🔌 Charging again"`
   - `healthChange`: health `good`→`OVERHEAT` → Notify containing `"health: OVERHEAT"`
   - `maxTempTracked`: samples 30, 36, 33 → `maxTempC == 36.0`; `resetMax()` → next sample sets it
-- [ ] **Step 2: Run** `scripts/jvmtest.sh` → FAIL (`BatteryMonitor` unresolved)
-- [ ] **Step 3: Implement `BatteryMonitor`** (state rises immediately; falls one level only when below that level's threshold minus `hysteresisC`; leaving EMERGENCY requires `< resumeC`). Move the existing "dropping while plugged in" check from `CameraService.checkBattery()` unchanged into `CameraService` (it uses `%`, kept as is).
-- [ ] **Step 4: Run** → all pass
-- [ ] **Step 5: Wire** `CameraService.checkBattery()`: build sample, `override` temp from `/testtemp` if set (`/testtemp <C>` = fake temperature for the next 3 checks), send each `Notify` via `bot.send`, on `PauseForHeat` → `stopRecording(); stopCamera(); heatPaused = true` (watchdog skips `startCamera()` while `heatPaused`), on `ResumeAfterHeat` → `heatPaused = false; startCamera()`. `/status` shows `Temp: 29.0 °C (max today 31.5)`.
-- [ ] **Step 6: Phone check:** `/testtemp 41` → Telegram "🌡️ Battery warm"; `/testtemp 51` → "🚨" + log `camera stopped` and no `camera started` for 3 min; after the override ends → log `camera started` + "✅ Battery temperature normal"
-- [ ] **Step 7: Commit** `feat: thermal states with heat pause (BatteryMonitor)`
+- [x] **Step 2: Run** `scripts/jvmtest.sh` → FAIL (`BatteryMonitor` unresolved)
+- [x] **Step 3: Implement `BatteryMonitor`** (state rises immediately; falls one level only when below that level's threshold minus `hysteresisC`; leaving EMERGENCY requires `< resumeC`). Move the existing "dropping while plugged in" check from `CameraService.checkBattery()` unchanged into `CameraService` (it uses `%`, kept as is).
+- [x] **Step 4: Run** → all pass
+- [x] **Step 5: Wire** `CameraService.checkBattery()`: build sample, `override` temp from `/testtemp` if set (`/testtemp <C>` = fake temperature for the next 3 checks), send each `Notify` via `bot.send`, on `PauseForHeat` → `stopRecording(); stopCamera(); heatPaused = true` (watchdog skips `startCamera()` while `heatPaused`), on `ResumeAfterHeat` → `heatPaused = false; startCamera()`. `/status` shows `Temp: 29.0 °C (max today 31.5)`.
+- [x] **Step 6: Phone check:** `/testtemp 41` → Telegram "🌡️ Battery warm"; `/testtemp 51` → "🚨" + log `camera stopped` and no `camera started` for 3 min; after the override ends → log `camera started` + "✅ Battery temperature normal"
+- [x] **Step 7: Commit** `feat: thermal states with heat pause (BatteryMonitor)`
 
 **Task 2 follow-ups**
 - 2026-11-08 (user-approved): battery temperature follows the charger, so the processor sensor (`sensor_arm`) is watched too through `core/HeatMonitor.kt`; camera pauses while either sensor is in EMERGENCY; `/testtemp cpu C`. First defaults 70/80/85, resume 75.
 - 2026-11-11 (user-measured): CPU thresholds lowered to **warn 52 / critical 55 / emergency 60 °C, resume 55** (log Nov 8–11: normal 37–50 °C, ~10% of minutes at ~50, 51–54 only ~35 min in 3 days; 61.5–63 °C in direct sun). Phone check: log `config: … cpu=52.0/55.0/60.0/55.0°C`; `/testtemp cpu 61` → "🚨 Phone CPU 61.0 °C: camera stopped", camera back once the real reading is below 55.
 
-### Task 3: Alerts survive outages + offline summary (+ fixes from the 2026-11-08 incidents)
+### Task 3: Alerts survive outages + offline summary (+ fixes from the 2026-11-08 incidents) 🔄 (code done; phone re-test pending)
 
 Evidence: 18:12 `/snapshot` photo upload failed with `EOFException` 3+ times and every text reply waited behind it until ~18:26; outages 20:18–22:59 and 23:48–03:29 made `/record off`, `/alerts off`, `/videos off` arrive ~80 min late and the 2-minute rule skipped them silently; 22 alert photos/videos were dropped after 8 tries.
 
@@ -119,14 +119,16 @@ Evidence: 18:12 `/snapshot` photo upload failed with `EOFException` 3+ times and
 - **Every failed try is logged** with its duration: `telegram: sending photo failed (try 4, 71 s): EOFException: null`.
 - `enum class LateAction { RUN, SKIP }`; `object LateCommands { val RUN_WHEN_LATE = setOf("/record", "/alerts", "/videos", "/status", "/help", "/start", "/log", "/last", "/reload"); fun action(name: String, ageS: Long, maxAgeS: Long = 120): LateAction }`. A skipped command gets the reply `"⏭ Skipped /snapshot: sent 80 min ago while I was offline."`; a late one that runs is logged `telegram: running late command '/record off' (4808s old)`.
 
-- [ ] **Step 1: Tests:** `shortBlipIsNotAnOutage` (fail at 0, success at 30 s → `null`); `outageReportedOnce` (fail 0, fail 70 s, success 90 s → `Outage(0, 90000, 0)`; next success → `null`); `motionsCountedOnlyWhileOffline` (2 motions online, fail, 3 motions, success after 2 min → `motions == 3`); `freshCommandsRun` (any name, age 5 s → RUN); `lateSettingsRun` (`/record`, `/alerts`, `/videos` at 4808 s → RUN); `lateActionsSkipped` (`/snapshot`, `/clip`, `/sshd`, `/testkill`, `/testtemp` at 4808 s → SKIP); `boundaryIsInclusive` (`/clip` at exactly 120 s → RUN, 121 s → SKIP)
-- [ ] **Step 2: Run** → FAIL
-- [ ] **Step 3: Implement**; in `Bot.pollLoop` call `onFailure`/`onSuccess`; on an `Outage` send `"📴 Was offline HH:mm–HH:mm (N min), M motions while offline"`
-- [ ] **Step 4: Run** → pass
+- [x] **Step 1: Tests:** `shortBlipIsNotAnOutage` (fail at 0, success at 30 s → `null`); `outageReportedOnce` (fail 0, fail 70 s, success 90 s → `Outage(0, 90000, 0)`; next success → `null`); `motionsCountedOnlyWhileOffline` (2 motions online, fail, 3 motions, success after 2 min → `motions == 3`); `freshCommandsRun` (any name, age 5 s → RUN); `lateSettingsRun` (`/record`, `/alerts`, `/videos` at 4808 s → RUN); `lateActionsSkipped` (`/snapshot`, `/clip`, `/sshd`, `/testkill`, `/testtemp` at 4808 s → SKIP); `boundaryIsInclusive` (`/clip` at exactly 120 s → RUN, 121 s → SKIP)
+- [x] **Step 2: Run** → FAIL
+- [x] **Step 3: Implement**; in `Bot.pollLoop` call `onFailure`/`onSuccess`; on an `Outage` send `"📴 Was offline HH:mm–HH:mm (N min), M motions while offline"`
+- [x] **Step 4: Run** → pass
 - [ ] **Step 5: Phone check:** turn off home internet (router WAN or Wi-Fi off on router) for 3 min, walk past during it, and send `/videos off` and `/snapshot` from mobile data during it; restore → Telegram: the delayed alert photo arrives, "📴 Was offline … 1 motions while offline", "Motion videos: OFF" (late setting applied), "⏭ Skipped /snapshot …"; log has no `gave up sending`. Then `/videos on`.
 - [ ] **Step 6: Commit** `feat: keep alerts through outages, offline summary`
 
 ### Task 4: Network diagnostics + IP in status
+
+Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–22:59 and 23:48–03:29, **Nov 11 14:09–17:51 (3 h 42 min, 3 motions, cause unknown)**; short blips Nov 9 18:22 and Nov 11 06:44 were Telegram HTTP 502 (server side).
 
 **Files:** Create `core/NetDiag.kt` + test; Modify `Bot.kt`, `CameraService.kt` (`statusText()`, back-online text)
 

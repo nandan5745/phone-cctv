@@ -1,10 +1,10 @@
 # Status
 
-**Updated:** 2026-11-11 · **Installed on the phone:** 0.4.17 (commit `36ddda4`, CPU thresholds 52/55/60, resume 55)
+**Updated:** 2026-11-11 · **Installed on the phone:** 0.4.21 (commit `70503af`, network diagnostics + IP in `/status`)
 
 ## Current task
 
-**Task 4** (network diagnostics + IP in `/status`). Tasks 1–3 are closed; Task 3 is closed **partly untested** (below). "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
+**Task 5** (storage dashboard + daily summary). Tasks 1–4 are closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
 
 ## Where we are
 
@@ -13,8 +13,8 @@
 | 1 Test infrastructure | ✅ done 2026-11-08 |
 | 2 Battery + CPU heat levels, heat pause | ✅ done 2026-11-08 · follow-up (CPU 52/55/60, resume 55) ✅ phone-checked 2026-11-11 |
 | 3 Alerts survive outages, two send lanes, late commands, offline summary | ✅ done 2026-11-11, **partly untested** (accepted risk) |
-| 4 Network diagnostics + IP in `/status` | 🔄 code pushed, phone check pending |
-| 5 Storage dashboard + daily summary | ⏳ |
+| 4 Network diagnostics + IP in `/status` | ✅ done 2026-11-11 (IP phone-checked; outage cause untested until a real outage) |
+| 5 Storage dashboard + daily summary | 🔄 current |
 | 6 Housekeeping (drop `QUICKBOOT_POWERON`, uninstall Termux:Boot) + Phase 5 review | ⏳ |
 | 7–22 (Phases 6–10) | ⏳ |
 
@@ -29,13 +29,14 @@ The owner can't cut the Wi-Fi, so the planned outage re-test can't be run.
 
 ## Exact next step
 
-1. **Task 4:** code pushed (NetDiag, IP in `/status` and back-online, outage cause after 2 min offline; 34 tests). Install the new APK; phone check: `/status` shows `Wi-Fi: <network>, IP <address>, … dBm`; the back-online message shows the IP. The cause line waits for a natural outage (or the phone's own Wi-Fi switched off for 3+ min, if the owner can). Then `task-done 4` with BASE `ca62381`.
+1. **Task 5** (`task-start docs/plans/phases-5-10.md 5`, docs/WORKFLOW.md §1): TDD `core/StorageMath.kt` and `core/DailyStats.kt` (Step 1 tests in the plan).
 2. When the owner has set a screen PIN (secure start-up "No"): one reboot test without unlocking; quote the `started: phone rebooted (first signal: …)` line in docs/FEATURES.md and docs/PHONE.md.
 
 ## Waiting on the owner
 
 - Screen PIN, then the reboot test above.
 - Mobile data off: still to verify (docs/PHONE.md).
+- On the next real outage: nothing to do, but the log will show Task 3's and Task 4's untested lines (`running late command`, `net: outage cause:`).
 
 ## Open issues
 

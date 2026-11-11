@@ -126,7 +126,7 @@ Evidence: 18:12 `/snapshot` photo upload failed with `EOFException` 3+ times and
 - [x] **Step 5: Phone check — partly done, rest accepted as untested (owner, 2026-11-11: the Wi-Fi can't be cut).** Seen: outage summaries incl. motion count (`outage 14:09-17:51, 3 motions`), short text/media retries. Not seen: alert delivered after a long outage, `running late command`, new-style `skipped old command` + reply, lanes under a stuck upload (docs/INCIDENTS.md S15). The planned re-test, kept for a future natural outage: `/alerts on`, `/record on`; cut the home internet (router WAN or router off); walk past; from mobile data send `/videos off` and `/snapshot`; keep the internet off **≥ 3 more minutes after sending** (so they arrive > 2 min old); restore → Telegram: the delayed alert photo, "📴 Was offline …, ≥1 motions while offline", "Motion videos: OFF" + log `running late command '/videos off'`, "⏭ Skipped /snapshot …" + log `skipped old command`; log has no `queue full`. Then `/videos on`. (A first cut test on 2026-11-11 had alerts OFF and fresh commands, so it proved only the outage summary.)
 - [x] **Step 6: Commit**: code shipped in `47824b0` (0.4.16). Closed 2026-11-11 (docs commit; INCIDENTS O2 → S15).
 
-### Task 4: Network diagnostics + IP in status
+### Task 4: Network diagnostics + IP in status ✅ (done 2026-11-11; outage-cause line untested until a real outage)
 
 Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–22:59 and 23:48–03:29, **Nov 11 14:09–17:51 (3 h 42 min, 3 motions, cause unknown)**; short blips Nov 9 18:22 and Nov 11 06:44 were Telegram HTTP 502 (server side).
 
@@ -138,8 +138,8 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 - [x] **Step 1: Tests:** `formatsLittleEndianIp` (`0x097100CB` → `"203.0.113.9"`, a documentation-only address); `classifyWifiDown` (`classify(false, 204)` and `classify(false, null)` → `WIFI_DOWN`); `classifyPortal` (`classify(true, 200)`, `classify(true, 302)` → `CAPTIVE_PORTAL`); `classifyNoInternet` (`classify(true, null)` → `NO_INTERNET`); `classifyTelegramDown` (`classify(true, 204)` → `TELEGRAM_DOWN`)
 - [x] **Step 2: Run** → FAIL. **Step 3: Implement**; probe runs once on the poller thread after 2 min offline. **Step 4: Run** → pass (34 tests; extra: `formatsHighBytes`, `OutageTracker.offlineMs` + `offlineTimeCountsFromFirstFailure`; Wi-Fi state from `WifiManager`, no new permission; back-online text built at send time so a fresh boot shows the IP)
-- [ ] **Step 5: Phone check:** `/status` Wi-Fi line changes from `Wi-Fi: -77 dBm (3/4)` to `Wi-Fi: <ssid>, IP <addr>, -77 dBm (3/4)`; "back online" shows the IP; next real outage (or a Wi-Fi toggle on the phone, if the owner can) → summary names the cause, e.g. `(cause: no internet)`
-- [ ] **Step 6: Commit** `feat: network diagnostics, IP in status`
+- [x] **Step 5: Phone check (2026-11-11, 0.4.21):** IP part done: owner confirmed the back-online message and `/status` show `Wi-Fi: <network>, IP …` (log `22:57:32 process started, version 0.4.21`, `started: app updated`). Outage-cause part **untested until a real outage**. Planned check: `/status` Wi-Fi line changes from `Wi-Fi: -77 dBm (3/4)` to `Wi-Fi: <ssid>, IP <addr>, -77 dBm (3/4)`; "back online" shows the IP; next real outage (or a Wi-Fi toggle on the phone, if the owner can) → summary names the cause, e.g. `(cause: no internet)`
+- [x] **Step 6: Commit** `feat: network diagnostics, IP in status` (`70503af`) + docs close commit
 
 ### Task 5: Storage dashboard + daily summary
 

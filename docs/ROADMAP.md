@@ -10,7 +10,7 @@ Copied from the approved planning document, without private details. Step-by-ste
 | 2 | Motion detection, clips, storage cap | ✅ done 2026-11-06 |
 | 3 | Telegram bot, alerts, commands | ✅ done 2026-11-06 |
 | 4 | Reliability: boot/update start, alarm watchdog, sshd at boot | ✅ done 2026-11-07 (7-day soak still to come) |
-| 5 | Safety and operations | 🔄 Tasks 1–3 done (Task 3 partly untested on the phone, accepted risk); Task 4 current; Tasks 5–6 next |
+| 5 | Safety and operations | 🔄 Tasks 1–4 done (Task 3 partly untested, Task 4 outage cause untested until a real outage); Task 5 current; Task 6 next |
 | 6 | Roommates and roles | ⏳ not started |
 | 7 | Security hardening, SSH on demand, SECURITY.md | ⏳ not started |
 | 8 | Better motion detection (zones, background model, darkness, IR test) | ⏳ not started |

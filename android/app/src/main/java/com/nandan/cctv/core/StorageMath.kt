@@ -18,3 +18,17 @@ fun mbPerDay(sizesByDay: Map<String, Long>, today: String): Double {
     if (days.isEmpty()) return 0.0
     return days.sumOf { sizesByDay.getValue(it) } / MB / days.size
 }
+
+/**
+ * The "days left" part of the storage line. Below the cap: days until the cap starts deleting.
+ * At or over it, that would always be 0 and look like a fault, so show how many days of
+ * history the cap holds instead (cap ÷ MB/day).
+ */
+fun storageOutlook(usedMb: Long, capMb: Int, mbPerDay: Double): String {
+    val atCap = usedMb >= capMb
+    return when {
+        mbPerDay <= 0 -> if (atCap) "at cap, rate not known yet" else "rate not known yet"
+        atCap -> "at cap: keeps about ${"%.0f".format(java.util.Locale.US, capMb / mbPerDay)} days of history"
+        else -> "~${"%.0f".format(java.util.Locale.US, retentionDays(usedMb, capMb, mbPerDay))} days until the cap (then oldest deleted)"
+    }
+}

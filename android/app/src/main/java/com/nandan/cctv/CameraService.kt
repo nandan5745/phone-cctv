@@ -40,7 +40,7 @@ import com.nandan.cctv.core.HeatMonitor
 import com.nandan.cctv.core.DailyStats
 import com.nandan.cctv.core.MotionDetector
 import com.nandan.cctv.core.mbPerDay
-import com.nandan.cctv.core.retentionDays
+import com.nandan.cctv.core.storageOutlook
 import com.nandan.cctv.core.formatIpv4
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -736,16 +736,11 @@ class CameraService : Service(), Bot.Control {
             "Camera: ${if (heatPaused) "PAUSED (too hot)" else if (camera != null || recorder != null) "${width}x$height" else "NOT RUNNING"}${if (recorder != null) ", recording now" else ""}"
     }
 
-    /** "Storage: 819 files (300 clips, 519 photos), 295/1200 MB, oldest 2026-11-06, ~N days until the cap, disk free …" */
+    /** "Storage: 819 files (300 clips, 519 photos), 295/1200 MB, oldest 2026-11-06, ~N days until the cap (or "at cap: keeps about N days of history"), disk free …" */
     private fun storageText(): String {
         val s = Storage.summary()
         val today = DailyStats.day(System.currentTimeMillis(), TimeZone.getDefault())
-        val days = retentionDays(s.usedMb, config.storageCapMB, mbPerDay(s.sizesByDay, today))
-        val left = when {
-            days == null -> "rate not known yet"
-            days < 0.5 -> "at the cap, oldest deleted first"
-            else -> "~${"%.0f".format(days)} days until the cap (then oldest deleted)"
-        }
+        val left = storageOutlook(s.usedMb, config.storageCapMB, mbPerDay(s.sizesByDay, today))
         return "Storage: ${s.clips + s.photos} files (${s.clips} clips, ${s.photos} photos), " +
             "${s.usedMb}/${config.storageCapMB} MB, oldest ${s.oldest ?: "-"}, $left; disk free ${Storage.freeMB()} MB"
     }

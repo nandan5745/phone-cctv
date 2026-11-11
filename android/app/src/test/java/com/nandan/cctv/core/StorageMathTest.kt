@@ -35,4 +35,22 @@ class StorageMathTest {
         assertEquals(150.0, mbPerDay(mapOf("2026-11-10" to 150 * mb), today = "2026-11-11"), 0.001)
         assertEquals(0.0, mbPerDay(mapOf("2026-11-11" to 50 * mb), today = "2026-11-11"), 0.001)
     }
+
+    @Test
+    fun outlookBelowCapShowsDaysUntilCap() {
+        assertEquals("~6 days until the cap (then oldest deleted)", storageOutlook(600, 1200, 100.0))
+    }
+
+    @Test
+    fun outlookAtCapShowsHistoryKept() {
+        // At or over the cap, "days left" would always be 0: show how much history the cap holds instead.
+        assertEquals("at cap: keeps about 20 days of history", storageOutlook(1200, 1200, 60.0))
+        assertEquals("at cap: keeps about 20 days of history", storageOutlook(1250, 1200, 60.0))
+    }
+
+    @Test
+    fun outlookWithoutRate() {
+        assertEquals("rate not known yet", storageOutlook(600, 1200, 0.0))
+        assertEquals("at cap, rate not known yet", storageOutlook(1200, 1200, 0.0))
+    }
 }

@@ -29,7 +29,7 @@ The owner can't cut the Wi-Fi, so the planned outage re-test can't be run.
 
 ## Exact next step
 
-1. **Task 5:** code pushed (StorageMath, DailyStats, `/summary`, storage line in `/status`; 41 tests). Install; phone check: `/status` shows `Storage: N files (C clips, P photos), used/1200 MB, oldest …, ~D days until the cap`; `/summary` replies; tomorrow 09:00 the summary arrives unprompted (log `daily summary sent`). Then `task-done 5` with BASE `55c160c`.
+1. **Task 5:** installed 0.4.23; `/status` storage line and `/summary` confirmed 2026-11-11. Follow-up pushed (at the cap: "keeps about N days of history"). **Remaining:** the summary must arrive by itself after 09:00 on 2026-11-12 (log `daily summary sent`). Then `task-done 5` with BASE `55c160c`, and Task 6.
 2. When the owner has set a screen PIN (secure start-up "No"): one reboot test without unlocking; quote the `started: phone rebooted (first signal: …)` line in docs/FEATURES.md and docs/PHONE.md.
 
 ## Waiting on the owner

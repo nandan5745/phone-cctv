@@ -55,7 +55,7 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `OutageTracker.kt` | Start/end of Telegram outages (≥ 60 s), motions while offline, time offline so far. | `OutageTrackerTest` (4) |
 | `NetDiag.kt` | Phone IP from Android's little-endian int; likely outage cause (Wi-Fi down / login page / no internet / Telegram only). | `NetDiagTest` (6) |
 | `LateCommands.kt` | Which late commands still run (settings, read-only) and which are skipped. | `LateCommandsTest` (5) |
-| `StorageMath.kt` | MB/day from the last 3 complete days; days until the size cap starts deleting. | `StorageMathTest` (3) |
+| `StorageMath.kt` | MB/day from the last 3 complete days; days until the size cap starts deleting, or at the cap the days of history it holds (`storageOutlook`). | `StorageMathTest` (6) |
 | `DailyStats.kt` | Daily-summary counters (motions, clips, alerts, restarts, offline min, max CPU °C), JSON in prefs, when the summary is due. | `DailyStatsTest` (3) |
 
 ### Other files

@@ -152,7 +152,7 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 - [x] **Step 1: Tests:** `retentionFromRate` (600 used, cap 1200, 100/day → `6.0` = cap ÷ rate); `noRateNoEstimate`; `mbPerDayUsesLastThreeCompleteDays`; `summaryDueOncePerDay` (due at 09:00 when last sent yesterday; not due again same day; not due at 08:59; a clock jump back to yesterday with `lastSentDay` = today → not due); `summaryTextHasAllCounters`
 - [x] **Step 2: Run** → FAIL. **Step 3: Implement**; `CameraService` increments counters, checks `summaryDue` every minute in the battery watcher, sends, resets, stores `lastSentDay`. `/summary` sends it immediately without resetting. **Step 4: Run** → pass (41 tests; rulings: `retentionDays` = days until the cap, `mbPerDay(…, today)`, `summaryDue` in the companion, `/summary` runs when late, max temp = real CPU reading — docs/DECISIONS.md)
-- [ ] **Step 5: Phone check:** `/status` shows `Storage: 590 files (148 clips, 442 photos), 135/1200 MB, oldest 2026-11-06, ~N days left`; `/summary` returns the report; next day at 09:00 the summary arrives unprompted (evidence: Telegram message time)
+- [ ] **Step 5: Phone check:** (2026-11-11, 0.4.23: `/status` storage line and `/summary` confirmed by the owner; **follow-up (owner):** at the cap show `at cap: keeps about N days of history` instead of a stuck "0 days", `storageOutlook` + 3 tests; still open: the unprompted 09:00 summary on 2026-11-12) `/status` shows `Storage: 590 files (148 clips, 442 photos), 135/1200 MB, oldest 2026-11-06, ~N days left`; `/summary` returns the report; next day at 09:00 the summary arrives unprompted (evidence: Telegram message time)
 - [ ] **Step 6: Commit** `feat: storage dashboard and daily summary`
 
 ### Task 6: Housekeeping + Phase 5 review

@@ -34,11 +34,16 @@ class Config private constructor(j: JSONObject) {
     val tempEmergencyC: Double = j.optDouble("tempEmergencyC", 50.0)
     val tempResumeC: Double = j.optDouble("tempResumeC", 42.0)
 
-    /** Processor (sensor_arm) thresholds. It runs ~52 °C normally; the battery reading follows the charger. */
-    val cpuWarnC: Double = j.optDouble("cpuWarnC", 70.0)
-    val cpuCriticalC: Double = j.optDouble("cpuCriticalC", 80.0)
-    val cpuEmergencyC: Double = j.optDouble("cpuEmergencyC", 85.0)
-    val cpuResumeC: Double = j.optDouble("cpuResumeC", 75.0)
+    /**
+     * Processor (sensor_arm) thresholds. Measured Nov 8–11 (3,861 minutes): normally 37–50 °C,
+     * ~10% of minutes at ~50 °C, 51–54 °C only ~35 min in 3 days; 61.5–63 °C in direct sun
+     * was already very hot. Resume at 55, not 50, so it doesn't flip warm/normal all day.
+     * (The battery reading follows the charger, see docs/INCIDENTS.md.)
+     */
+    val cpuWarnC: Double = j.optDouble("cpuWarnC", 52.0)
+    val cpuCriticalC: Double = j.optDouble("cpuCriticalC", 55.0)
+    val cpuEmergencyC: Double = j.optDouble("cpuEmergencyC", 60.0)
+    val cpuResumeC: Double = j.optDouble("cpuResumeC", 55.0)
 
     /** For the log. Never includes the bot token itself. */
     override fun toString() =

@@ -102,6 +102,10 @@ Phone check = `scripts/deploy.sh` (unlock phone, tap Install, Done) then the lis
 - [ ] **Step 6: Phone check:** `/testtemp 41` → Telegram "🌡️ Battery warm"; `/testtemp 51` → "🚨" + log `camera stopped` and no `camera started` for 3 min; after the override ends → log `camera started` + "✅ Battery temperature normal"
 - [ ] **Step 7: Commit** `feat: thermal states with heat pause (BatteryMonitor)`
 
+**Task 2 follow-ups**
+- 2026-11-08 (user-approved): battery temperature follows the charger, so the processor sensor (`sensor_arm`) is watched too through `core/HeatMonitor.kt`; camera pauses while either sensor is in EMERGENCY; `/testtemp cpu C`. First defaults 70/80/85, resume 75.
+- 2026-11-11 (user-measured): CPU thresholds lowered to **warn 52 / critical 55 / emergency 60 °C, resume 55** (log Nov 8–11: normal 37–50 °C, ~10% of minutes at ~50, 51–54 only ~35 min in 3 days; 61.5–63 °C in direct sun). Phone check: log `config: … cpu=52.0/55.0/60.0/55.0°C`; `/testtemp cpu 61` → "🚨 Phone CPU 61.0 °C: camera stopped", camera back once the real reading is below 55.
+
 ### Task 3: Alerts survive outages + offline summary (+ fixes from the 2026-11-08 incidents)
 
 Evidence: 18:12 `/snapshot` photo upload failed with `EOFException` 3+ times and every text reply waited behind it until ~18:26; outages 20:18–22:59 and 23:48–03:29 made `/record off`, `/alerts off`, `/videos off` arrive ~80 min late and the 2-minute rule skipped them silently; 22 alert photos/videos were dropped after 8 tries.

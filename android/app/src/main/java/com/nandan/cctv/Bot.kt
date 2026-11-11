@@ -247,7 +247,7 @@ class Bot(private val control: Control) {
             "/testtemp" -> {
                 val cpu = arg == "cpu"
                 val c = (if (cpu) parts.getOrNull(2) else arg)?.toDoubleOrNull()
-                if (c == null || c !in 1.0..150.0) send("Usage: /testtemp 51   or   /testtemp cpu 86")
+                if (c == null || c !in 1.0..150.0) send("Usage: /testtemp 51   or   /testtemp cpu 61")
                 else { send("Pretending the ${if (cpu) "processor" else "battery"} is $c °C for 3 minutes."); control.testTemp(c, cpu) }
             }
             "/log" -> send(FileLog.tail(30))

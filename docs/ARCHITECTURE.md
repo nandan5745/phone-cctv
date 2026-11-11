@@ -119,6 +119,8 @@ App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the t
 | `tempWarnC` / `tempCriticalC` / `tempEmergencyC` / `tempResumeC` | 40 / 45 / 50 / 42 | Battery temperature levels (°C). |
 | `cpuWarnC` / `cpuCriticalC` / `cpuEmergencyC` / `cpuResumeC` | 52 / 55 / 60 / 55 | Processor (`sensor_arm`) levels (°C), measured 2026-11-11. |
 
+How the levels move (HeatMonitor, hysteresis 2 °C): a level is entered as soon as its threshold is reached; it is left only below an exit point. CPU: WARNING exits below 50, CRITICAL below 53, EMERGENCY below 55 (= resume; the camera restarts and the state drops to CRITICAL if the reading is 53–54.9, without a new message). Battery: exits below 38 / 43 / 42. Messages: on every rise, "❄️ … camera back on" when leaving EMERGENCY, "✅ … normal" on reaching NORMAL.
+
 Change settings: write `/sdcard/cctv/config.json` over SSH, then open the app (`am start -n com.nandan.cctv/.MainActivity`) or send `/reload`. The import **replaces** the whole private config, so include the Telegram keys too.
 
 ## 7. Telegram commands

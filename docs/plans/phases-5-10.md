@@ -1,6 +1,6 @@
 # Phases 5–10 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** the owner chose **native execution**: use superpowers:executing-plans (one session, no subagent per task); see docs/WORKFLOW.md §1. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Take the working phone CCTV (v0.4.x) to a safe, multi-user, measurable system: thermal/outage safety, roommate roles, on-demand SSH, better motion detection, two native phone features, tests and measured results.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Kotlin 2.1.0, AGP 8.7.3, Gradle 8.10.2, Android framework only (minSdk 21 / targetSdk 22), JUnit 4.13.2 + `org.json:json:20231013` (test only), GitHub Actions.
 
-**Spec:** the approved roadmap (local plan file "Phone CCTV: findings, answers, and roadmap (Phases 5–10)"), sections 0 and 6. Repo rules: `CLAUDE.md`.
+**Spec:** `docs/ROADMAP.md` (public copy of the approved roadmap; the original is a private local file). Repo rules: `CLAUDE.md`. Current position: `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -21,7 +21,7 @@
 - "Done" for a phone-facing task = quoted phone log lines or Telegram message.
 - Reviews: `/code-review` medium (high for Phases 6 and 7), never ultra.
 - Deadline: Tasks 1–17 (Phases 5–9) on the phone by end of week 3.
-- Local tests need `kotlinc` on the Mac (Homebrew `kotlin`, ~100 MB, needs your OK). Without it, every "Run `scripts/jvmtest.sh`" step becomes "push and read the CI test result", and the failing-test step is shown in the CI log of a temporary branch, not committed to `main`.
+- Local tests: `kotlinc` is installed on the Mac (Homebrew `kotlin`, 2026-11-08, ~470 MB with its OpenJDK); `scripts/jvmtest.sh` runs the `core` tests in seconds. CI runs them again before every APK.
 
 ## Review Focus
 
@@ -123,8 +123,8 @@ Evidence: 18:12 `/snapshot` photo upload failed with `EOFException` 3+ times and
 - [x] **Step 2: Run** → FAIL
 - [x] **Step 3: Implement**; in `Bot.pollLoop` call `onFailure`/`onSuccess`; on an `Outage` send `"📴 Was offline HH:mm–HH:mm (N min), M motions while offline"`
 - [x] **Step 4: Run** → pass
-- [ ] **Step 5: Phone check:** turn off home internet (router WAN or Wi-Fi off on router) for 3 min, walk past during it, and send `/videos off` and `/snapshot` from mobile data during it; restore → Telegram: the delayed alert photo arrives, "📴 Was offline … 1 motions while offline", "Motion videos: OFF" (late setting applied), "⏭ Skipped /snapshot …"; log has no `gave up sending`. Then `/videos on`.
-- [ ] **Step 6: Commit** `feat: keep alerts through outages, offline summary`
+- [ ] **Step 5: Phone check (re-test, owner):** `/alerts on`, `/record on`; cut the home internet (router WAN or router off); walk past; from mobile data send `/videos off` and `/snapshot`; keep the internet off **≥ 3 more minutes after sending** (so they arrive > 2 min old); restore → Telegram: the delayed alert photo, "📴 Was offline …, ≥1 motions while offline", "Motion videos: OFF" + log `running late command '/videos off'`, "⏭ Skipped /snapshot …" + log `skipped old command`; log has no `queue full`. Then `/videos on`. (A first cut test on 2026-11-11 had alerts OFF and fresh commands, so it proved only the outage summary.)
+- [x] **Step 6: Commit**: code shipped in `47824b0` (0.4.16). Closing Task 3 = ledger evidence + `task-done` + a docs commit (STATUS, plan ticks, INCIDENTS O2 → solved).
 
 ### Task 4: Network diagnostics + IP in status
 
@@ -133,12 +133,12 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 **Files:** Create `core/NetDiag.kt` + test; Modify `Bot.kt`, `CameraService.kt` (`statusText()`, back-online text)
 
 **Interfaces:**
-- Produces: `fun formatIpv4(littleEndian: Int): String`; `enum class OutageCause { WIFI_DOWN, CAPTIVE_PORTAL, NO_INTERNET }`; `fun classify(wifiConnected: Boolean, probeHttpCode: Int?): OutageCause` (probe = HTTP GET `http://connectivitycheck.gstatic.com/generate_204`; `204` → `NO_INTERNET` only if Telegram fails anyway, `200`/`302` → `CAPTIVE_PORTAL`, `null` → `NO_INTERNET`; not connected → `WIFI_DOWN`)
+- Produces: `fun formatIpv4(littleEndian: Int): String`; `enum class OutageCause { WIFI_DOWN, CAPTIVE_PORTAL, NO_INTERNET, TELEGRAM_DOWN }`; `fun classify(wifiConnected: Boolean, probeHttpCode: Int?): OutageCause` with probe = HTTP GET `http://connectivitycheck.gstatic.com/generate_204` during an outage: Wi-Fi not connected → `WIFI_DOWN`; probe got no response (`null`) → `NO_INTERNET`; probe `204` → `TELEGRAM_DOWN` (internet works, Telegram doesn't, e.g. HTTP 502); any other code (200, 302 …) → `CAPTIVE_PORTAL`. (Ruling 2026-11-11: `TELEGRAM_DOWN` added to make the 204 case unambiguous.)
 - `Outage` summary text gains the cause.
 
-- [ ] **Step 1: Tests:** `formatsLittleEndianIp` (`0x097100CB` → `"203.0.113.9"`, a documentation-only address); `classifyWifiDown`; `classifyPortal` (200 → `CAPTIVE_PORTAL`, 302 → `CAPTIVE_PORTAL`); `classifyNoInternet` (`null` → `NO_INTERNET`)
+- [ ] **Step 1: Tests:** `formatsLittleEndianIp` (`0x097100CB` → `"203.0.113.9"`, a documentation-only address); `classifyWifiDown` (`classify(false, 204)` and `classify(false, null)` → `WIFI_DOWN`); `classifyPortal` (`classify(true, 200)`, `classify(true, 302)` → `CAPTIVE_PORTAL`); `classifyNoInternet` (`classify(true, null)` → `NO_INTERNET`); `classifyTelegramDown` (`classify(true, 204)` → `TELEGRAM_DOWN`)
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement**; probe runs once on the poller thread after 2 min offline. **Step 4: Run** → pass
-- [ ] **Step 5: Phone check:** `/status` shows `Wi-Fi: <ssid>, IP <addr>, -55 dBm`; "back online" shows the IP; repeat Task 3 outage → summary says `(cause: no internet)`
+- [ ] **Step 5: Phone check:** `/status` Wi-Fi line changes from `Wi-Fi: -77 dBm (3/4)` to `Wi-Fi: <ssid>, IP <addr>, -77 dBm (3/4)`; "back online" shows the IP; repeat Task 3 outage → summary says `(cause: no internet)`
 - [ ] **Step 6: Commit** `feat: network diagnostics, IP in status`
 
 ### Task 5: Storage dashboard + daily summary

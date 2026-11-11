@@ -21,6 +21,8 @@ Copied from the approved planning document, without private details. Step-by-ste
 
 Roommates via **private chats** (approved with `/allow`), SSH **on demand**, night = **IR remote test + low-light tuning**, timeline **2–4 weeks**. Phases 5–9 must be on the phone by the **end of week 3** so the 7-day soak in week 4 runs on final code.
 
+Week 1 started 2026-11-08 (roadmap approval): end of week 3 = **2026-11-28**, soak ends **2026-12-05**.
+
 | Week | Work |
 |---|---|
 | 1 | Phase 5 + Phase 6 |

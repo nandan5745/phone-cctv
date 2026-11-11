@@ -51,7 +51,7 @@ Each entry: symptom, evidence, root cause, fix, commit, status. Newest open ones
 
 ### S5. App didn't start after reboot
 - **Evidence:** after a reboot no `receiver:` line at all, and Termux:Boot didn't run either; `ro.config.low_ram=true`.
-- **Root cause:** the phone never delivers `BOOT_COMPLETED` to installed apps.
+- **Root cause:** the phone never delivers `BOOT_COMPLETED` to installed apps. Most likely the vendor's low-RAM-mode filtering (`ro.config.low_ram=true`); the exact mechanism is unproven (no system log access).
 - **Fix:** also listen for Wi-Fi/network/charger/unlock/storage events; first one starts the service. Commit `99fbf44`. Reboot test passed 2026-11-07 (`receiver: android.net.wifi.WIFI_STATE_CHANGED (uptime 0 min)`).
 
 ### S6. Crashed service didn't come back
@@ -66,7 +66,7 @@ Each entry: symptom, evidence, root cause, fix, commit, status. Newest open ones
 ### S8. Replies 14 minutes late (2026-11-08 18:12)
 - **Evidence:** commands received on time (`/snapshot` 18:12:46 … `/testtemp` 18:19:28); `sending photo failed (try 1..3): EOFException`; all replies arrived together ~18:26.
 - **Root cause:** one send queue; a photo upload kept breaking on weak Wi-Fi and every text reply waited behind it.
-- **Fix:** separate `tg-text` and `tg-media` lanes; every failed try logged with its duration. Commit `47824b0`.
+- **Fix:** separate `tg-text` and `tg-media` lanes; every failed try logged with its duration. Commit `47824b0`. **Status:** fix shipped; not yet observed under another stuck upload (see O2).
 
 ### S9. Settings commands silently ignored (2026-11-08 21:37)
 - **Evidence:** outage 20:18–22:59; at 22:59 `skipped old command '/record off' (4808s old)` (also `/alerts off`, `/videos off`).

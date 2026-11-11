@@ -36,7 +36,7 @@ Format: **decision** (date): why · rejected alternatives · cost if wrong.
 | Complete-MP4 check = boxes add up to file size (11-06) | `moov` is at the start on this phone | "has moov" | — |
 | Warnings on **voltage**, not % (11-06) | % is wrong on this phone | % only | — |
 | **1-minute AlarmManager** check (11-07) | START_STICKY doesn't restart here | 5-minute check | A wake-up per minute (CPU is awake anyway) |
-| **Event-based start** (Wi-Fi/network/charger/unlock/storage) (11-07) | `BOOT_COMPLETED` blocked (low-RAM mode) | Termux:Boot (same block) | — |
+| **Event-based start** (Wi-Fi/network/charger/unlock/storage) (11-07) | `BOOT_COMPLETED` never arrives (likely low-RAM-mode filtering; mechanism unproven) | Termux:Boot (same block) | — |
 | sshd via **Termux RUN_COMMAND** + `allow-external-apps` (11-07, owner OK) | SSH after reboot without Termux:Boot | Termux:Boot | Any app with that permission can run code in Termux |
 | **Two send lanes** (text / media) (11-09) | A stuck upload delayed replies 14 min | One queue | One extra thread |
 | **Retry until delivered**, queues bounded at 20 (11-09) | Alerts and warnings were lost in outages | Give up after 8 tries | A reply can arrive hours late, in order |
@@ -72,6 +72,7 @@ Format: **decision** (date): why · rejected alternatives · cost if wrong.
 | 2 (follow-up) | No unit test for the new CPU defaults (Config is Android; tested in Task 20) | a typo shows only on the phone |
 | 3 | Plan amended (owner OK): two lanes, late settings applied, every try logged | — |
 | 3 | Text also retries until delivered | stale reply arrives late |
+| 4 (pre-start, 11-11) | Outage cause enum gains `TELEGRAM_DOWN` (probe 204 = internet fine, Telegram not) | one more case to test |
 
 ## Rejected tools
 

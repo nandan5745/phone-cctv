@@ -1,5 +1,16 @@
 # How to work on this project
 
+## 0. Local setup on the Mac (not in the repo)
+
+| Thing | What it is | If missing |
+|---|---|---|
+| SSH alias `phone` in `~/.ssh/config` | `Host phone` with `HostName <phone's address>`, `Port <Termux sshd port>`, `User <Termux user>`, `HostKeyAlias phone-cctv` | Get the values from the owner (Termux: `whoami`, `ifconfig`); the host-key alias keeps the saved key valid when DHCP changes the address |
+| `~/.config/phone-cctv/private-patterns.txt` | One regex per line of private values (address prefix, Termux user, SSH port, bot username, email, key folder, phone MAC) for `scripts/privacy-check.sh` | Recreate from the same list; `chmod 600` |
+| Ledger `.superpowers/sdd/phases-5-10/progress.md` | Execution log: task completions, BASE commits, rulings (git-ignored) | Rulings are also in docs/DECISIONS.md; BASE = the commit before a task's first commit (`git log`) |
+| Local memory | Claude Code auto-memory for this project (`~/.claude/projects/<project>/memory/`): owner profile, preferences, private references | Not required to work; docs/ are the source of truth |
+| `kotlinc` | Homebrew `kotlin` | `brew install kotlin` (ask the owner; ~470 MB) |
+| superpowers plugin | Provides task-start/task-done | Version folder may differ: `ls ~/.claude/plugins/cache/claude-plugins-official/superpowers/` |
+
 ## 1. One task, start to finish
 
 1. Read `docs/STATUS.md` (exact next step) and the task in `docs/plans/phases-5-10.md`.
@@ -29,6 +40,7 @@ scripts/deploy.sh          # newest successful CI APK → phone → asks you to 
 ```
 Manual equivalent:
 ```sh
+gh run list --limit 3 --json databaseId,number,headSha   # databaseId = <run-id>; number = APK version 0.4.<number>
 gh run download <run-id> --name cctv-apk --dir .deploy
 scp .deploy/cctv.apk phone:/sdcard/Download/cctv.apk
 ssh phone 'am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d file:///sdcard/Download/cctv.apk'
@@ -66,7 +78,7 @@ Telegram token + owner ID: `scripts/set-telegram.sh` (asks for the token hidden,
 | Every pure-logic change | `superpowers:test-driven-development` |
 | Before saying "done" | `superpowers:verification-before-completion` (phone log or Telegram evidence) |
 | End of each phase | `/code-review` medium (high for Phases 6 and 7) — **never ultra** |
-| After Phase 6 and Phase 7 | `/security-review`, checked against `docs/SECURITY.md` |
+| After Phase 6 and Phase 7 | `/security-review`, checked against `docs/SECURITY.md` (created in Task 9) |
 | Before Phase 10 tests | `/simplify` on `CameraService.kt` |
 | Before Phase 8 and at the end (RESULTS.md) | `grilling` |
 | Anything fails on the phone | `superpowers:systematic-debugging` |

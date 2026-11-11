@@ -2,12 +2,16 @@
 
 **Updated:** 2026-11-11 · **Installed on the phone:** 0.4.16 (commit `47824b0`) · **Built, waiting to install:** 0.4.17 (commit `36ddda4`, CPU thresholds), APK already copied to `/sdcard/Download/cctv.apk`
 
+## Current task
+
+**Task 3** (open: phone re-test), plus the **Task 2 follow-up** phone check (CPU thresholds). Both need the owner. Task 4 starts after both. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
+
 ## Where we are
 
 | Task (docs/plans/phases-5-10.md) | Status |
 |---|---|
 | 1 Test infrastructure | ✅ done 2026-11-08 |
-| 2 Battery + CPU heat levels, heat pause | ✅ done 2026-11-08 · follow-up (CPU 52/55/60, resume 55) built, **phone check pending** |
+| 2 Battery + CPU heat levels, heat pause | ✅ done 2026-11-08 · ⚠️ follow-up (CPU 52/55/60, resume 55) built, **phone check pending** |
 | 3 Alerts survive outages, two send lanes, late commands, offline summary | 🔄 code done and installed · **phone re-test pending** (see below) |
 | 4 Network diagnostics + IP in `/status` | ⏭ next |
 | 5 Storage dashboard + daily summary | ⏳ |

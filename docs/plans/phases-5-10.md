@@ -159,7 +159,7 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 **Files:** Modify `AndroidManifest.xml` (remove `QUICKBOOT_POWERON`)
 
-- [ ] **Step 1:** Remove the action; push; CI green
+- [x] **Step 1:** Remove the action; push; CI green
 - [ ] **Step 2: Phone:** `ssh phone 'am start -a android.intent.action.DELETE -d package:com.termux.boot'` → you tap OK; `pm list packages | grep termux` shows only `com.termux`
 - [ ] **Step 3:** `/code-review medium` on the Phase 5 diff; fix findings (each fix = its own test + commit)
 - [ ] **Step 4: Phone check:** reboot → "back online … phone rebooted" (proves the receiver still works without that action)

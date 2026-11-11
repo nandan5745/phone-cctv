@@ -51,7 +51,7 @@ Week 1 started 2026-11-08 (roadmap approval): end of week 3 = **2026-11-28**, so
 | 4 | Clips/photos/log on `/sdcard`, readable by any app or anyone holding the unlocked phone | Medium (privacy) | Screen PIN; private storage = future work. Not full-disk encryption (needs PIN before boot) |
 | 5 | Alerts lost during outages | Medium | Fixed in Task 3 (retry until delivered) |
 | 6 | Telegram isn't end-to-end encrypted | Inherent | Documented |
-| 7 | Exported `BootReceiver` | Low: only `QUICKBOOT_POWERON` isn't system-protected, and it can only start the CCTV | Remove that action (Task 6) |
+| 7 | Exported `BootReceiver` | Low: only `QUICKBOOT_POWERON` wasn't system-protected, and it could only start the CCTV | Removed (Task 6, 2026-11-11) |
 | 8 | Command injection | None found (fixed script path, no shell for user text) | Keep it so; tests |
 | 9 | Bot token theft | Low (private storage, never logged, never committed) | — |
 | 10 | Bot spam | Low | Per-user rate limit (Phase 6) |

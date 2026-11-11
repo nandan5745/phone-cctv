@@ -38,6 +38,7 @@ import com.nandan.cctv.core.BatteryMonitor
 import com.nandan.cctv.core.BatterySample
 import com.nandan.cctv.core.HeatMonitor
 import com.nandan.cctv.core.MotionDetector
+import com.nandan.cctv.core.formatIpv4
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -230,10 +231,12 @@ class CameraService : Service(), Bot.Control {
             greeted = true
             FileLog.i("started: $reason")
             val version = packageManager.getPackageInfo(packageName, 0).versionName
-            bot.send("🟢 CCTV back online (v$version)\n" +
+            // Built when it goes out: right after a boot Wi-Fi often has no address yet.
+            bot.sendFresh { "🟢 CCTV back online (v$version)\n" +
                 "Why: $reason\n" +
+                "Wi-Fi: ${wifiText()}\n" +
                 "Battery ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
-                "Recording ${onOff(recordOn)}, alerts ${onOff(alertsOn)}, videos ${onOff(videosOn)}")
+                "Recording ${onOff(recordOn)}, alerts ${onOff(alertsOn)}, videos ${onOff(videosOn)}" }
         } else if (intent?.action == ACTION_OPEN) {
             reload() // opening the app again = reload settings
         }
@@ -710,8 +713,6 @@ class CameraService : Service(), Bot.Control {
         val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val mi = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
         val (count, mb) = Storage.stats()
-        val wifi = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo
-        val bars = WifiManager.calculateSignalLevel(wifi.rssi, 5)
         return "📊 CCTV status\n" +
             "Up: ${duration(SystemClock.elapsedRealtime() - serviceStartedAt)} (phone up ${duration(SystemClock.elapsedRealtime())})\n" +
             "Battery: ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
@@ -720,9 +721,21 @@ class CameraService : Service(), Bot.Control {
             "Storage: $count files, $mb MB of ${config.storageCapMB} MB cap, ${Storage.freeMB()} MB free\n" +
             "Recording: ${onOff(recordOn)}${if (photoOnly) " (photo-only fallback)" else ""}, alerts: ${onOff(alertsOn)}, videos: ${onOff(videosOn)}\n" +
             "RAM free: ${mi.availMem / 1_048_576} MB of ${mi.totalMem / 1_048_576} MB\n" +
-            "Wi-Fi: ${wifi.rssi} dBm ($bars/4)\n" +
+            "Wi-Fi: ${wifiText()}\n" +
             "Camera: ${if (heatPaused) "PAUSED (too hot)" else if (camera != null || recorder != null) "${width}x$height" else "NOT RUNNING"}${if (recorder != null) ", recording now" else ""}"
     }
+
+    private fun wifiInfo() = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo
+
+    /** "<network name>, IP <address>, -77 dBm (3/4)", or "not connected". */
+    private fun wifiText(): String {
+        val w = wifiInfo()
+        if (w == null || !wifiConnected()) return "not connected"
+        val bars = WifiManager.calculateSignalLevel(w.rssi, 5)
+        return "${(w.ssid ?: "?").trim('"')}, IP ${formatIpv4(w.ipAddress)}, ${w.rssi} dBm ($bars/4)"
+    }
+
+    override fun wifiConnected(): Boolean = wifiInfo()?.let { it.networkId != -1 && it.ipAddress != 0 } ?: false
 
     private fun duration(ms: Long): String {
         val m = ms / 60_000

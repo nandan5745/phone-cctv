@@ -1,13 +1,18 @@
 // Bot.kt: Telegram bot: tg-poll (long polling, commands), tg-text and tg-media send lanes with
-// retry-until-delivered, outage summary (core/OutageTracker), late commands (core/LateCommands).
+// retry-until-delivered, outage summary (core/OutageTracker) with its likely cause (core/NetDiag),
+// late commands (core/LateCommands).
 // Calls CameraService through Bot.Control. Docs: docs/ARCHITECTURE.md §3, §7; incidents S8–S10.
 
 package com.nandan.cctv
 
 import com.nandan.cctv.core.LateAction
 import com.nandan.cctv.core.LateCommands
+import com.nandan.cctv.core.OutageCause
 import com.nandan.cctv.core.OutageTracker
+import com.nandan.cctv.core.classify
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -41,11 +46,15 @@ class Bot(private val control: Control) {
         fun testKill()
         fun testStop()
         fun testTemp(celsius: Double, cpu: Boolean)
+        /** True if the phone is joined to a Wi-Fi network and has an address. */
+        fun wifiConnected(): Boolean
     }
 
     companion object {
         private const val POLL_TIMEOUT_S = 50
         private const val MAX_COMMAND_AGE_S = 120
+        private const val PROBE_AFTER_MS = 120_000L
+        private const val PROBE_URL = "http://connectivitycheck.gstatic.com/generate_204"
         const val HELP = "CCTV commands:\n" +
             "/snapshot – photo right now\n" +
             "/clip N – record N seconds (max 30) and send it\n" +
@@ -90,6 +99,8 @@ class Bot(private val control: Control) {
     // Telegram unreachable: when, for how long, and motions missed meanwhile.
     private val outage = OutageTracker()
     private val clock = SimpleDateFormat("HH:mm", Locale.US)
+    // Likely cause of the current outage, found once after PROBE_AFTER_MS offline (poller thread only).
+    private var outageCause: OutageCause? = null
 
     /** Called by the camera on every motion event (counts the ones seen while offline). */
     fun noteMotion() = synchronized(outage) { outage.noteMotion() }
@@ -127,6 +138,9 @@ class Bot(private val control: Control) {
     // and alerts were lost after 8 tries). Delays grow 5 s, 10 s, … up to 60 s.
 
     fun send(text: String) = deliver(textLane, "message") { a, chat -> a.sendMessage(chat, text) }
+
+    /** Like [send], but the text is built when it actually goes out (e.g. to show the current IP). */
+    fun sendFresh(make: () -> String) = deliver(textLane, "message") { a, chat -> a.sendMessage(chat, make()) }
 
     /** [jpeg] is the raw camera JPEG; it is rotated and time-stamped on the sender thread. */
     fun sendPhoto(jpeg: ByteArray, rotation: Int, label: String, caption: String) =
@@ -180,11 +194,14 @@ class Bot(private val control: Control) {
                     FileLog.i("telegram: reachable again after $failures failed tries")
                     failures = 0
                 }
+                val cause = outageCause?.text
+                outageCause = null
                 synchronized(outage) { outage.onSuccess(System.currentTimeMillis()) }?.let { o ->
                     val min = (o.endMs - o.startMs) / 60_000
-                    FileLog.i("telegram: outage ${clock.format(Date(o.startMs))}-${clock.format(Date(o.endMs))}, ${o.motions} motions")
-                    send("📴 Was offline ${clock.format(Date(o.startMs))}–${clock.format(Date(o.endMs))} ($min min), " +
-                        "${o.motions} motions while offline")
+                    FileLog.i("telegram: outage ${clock.format(Date(o.startMs))}-${clock.format(Date(o.endMs))}, ${o.motions} motions" +
+                        (cause?.let { ", cause: $it" } ?: ""))
+                    send("📴 Was offline ${clock.format(Date(o.startMs))}–${clock.format(Date(o.endMs))} ($min min" +
+                        (cause?.let { ", cause: $it" } ?: "") + "), ${o.motions} motions while offline")
                 }
                 backoff = 2_000L
                 for (i in 0 until updates.length()) {
@@ -199,14 +216,45 @@ class Bot(private val control: Control) {
             } catch (e: InterruptedException) {
                 break
             } catch (e: Exception) {
-                synchronized(outage) { outage.onFailure(System.currentTimeMillis()) }
+                val offlineMs = synchronized(outage) {
+                    outage.onFailure(System.currentTimeMillis())
+                    outage.offlineMs(System.currentTimeMillis())
+                }
                 failures++
                 if (failures == 1 || failures % 30 == 0) FileLog.w("telegram: poll failed ($failures): ${a.safe(e)}")
+                if (outageCause == null && offlineMs >= PROBE_AFTER_MS) outageCause = diagnose()
                 try { Thread.sleep(backoff) } catch (ie: InterruptedException) { break }
                 backoff = (backoff * 2).coerceAtMost(60_000L)
             }
         }
         FileLog.i("telegram: polling stopped")
+    }
+
+    /** Once per outage: is it Wi-Fi, a login page, the internet, or only Telegram? (docs/INCIDENTS.md O1) */
+    private fun diagnose(): OutageCause {
+        val wifi = try { control.wifiConnected() } catch (e: Exception) { false }
+        val code = probe()
+        val cause = classify(wifi, code)
+        FileLog.w("net: outage cause: ${cause.text} (wifi ${if (wifi) "connected" else "not connected"}, check page ${code ?: "no answer"})")
+        return cause
+    }
+
+    /** HTTP status of the check page, or null if nothing answered (the error is logged: DNS vs timeout). */
+    private fun probe(): Int? {
+        var c: HttpURLConnection? = null
+        return try {
+            c = URL(PROBE_URL).openConnection() as HttpURLConnection
+            c.instanceFollowRedirects = false
+            c.useCaches = false
+            c.connectTimeout = 10_000
+            c.readTimeout = 10_000
+            c.responseCode
+        } catch (e: Exception) {
+            FileLog.w("net: check page failed: ${e.javaClass.simpleName}: ${e.message}")
+            null
+        } finally {
+            c?.disconnect()
+        }
     }
 
     private fun handle(update: org.json.JSONObject) {

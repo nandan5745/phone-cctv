@@ -33,6 +33,9 @@ class OutageTracker(private val minOutageMs: Long = 60_000) {
         return if (o.endMs - o.startMs >= minOutageMs) o else null
     }
 
+    /** How long we've been offline (since the first failure), 0 when online. */
+    fun offlineMs(nowMs: Long): Long = if (startMs < 0) 0 else nowMs - startMs
+
     fun noteMotion() {
         if (offline) motions++
     }

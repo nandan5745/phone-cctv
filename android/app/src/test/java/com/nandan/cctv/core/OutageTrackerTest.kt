@@ -31,4 +31,15 @@ class OutageTrackerTest {
         repeat(3) { t.noteMotion() }
         assertEquals(3, t.onSuccess(120_000)!!.motions)
     }
+
+    @Test
+    fun offlineTimeCountsFromFirstFailure() {
+        val t = OutageTracker()
+        assertEquals(0L, t.offlineMs(50_000))
+        t.onFailure(10_000)
+        t.onFailure(70_000)
+        assertEquals(120_000L, t.offlineMs(130_000))
+        t.onSuccess(140_000)
+        assertEquals(0L, t.offlineMs(150_000))
+    }
 }

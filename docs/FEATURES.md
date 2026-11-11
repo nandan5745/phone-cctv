@@ -63,6 +63,8 @@ Every feature and command so far (Phases 1–5). **Tested on phone?** yes = seen
 | Outage detection + offline summary | OutageTracker; "📴 Was offline HH:mm–HH:mm (N min), M motions while offline" | yes | 2026-11-11 17:51:01 `outage 14:09-17:51, 3 motions` (3 `motion:` lines in that window); 2026-11-09 18:25:20 `outage 18:22-18:25, 0 motions` (Telegram HTTP 502) | Outages under 60 s aren't reported |
 | Retry until delivered | Every send retries (5 s → 60 s backoff) until sent; queues of 20, oldest dropped | partly | 2026-11-10 10:55:28 `sent message on try 3`; 2026-11-11 18:27:22 `sent video on try 2` | **Untested: I can't cut Wi-Fi.** An alert held through a long outage was never seen (alerts were off on Nov 11) |
 | Two send lanes | `tg-text` and `tg-media` threads, so a stuck upload can't delay replies | partly | Both lanes log (`[tg-text]`, `[tg-media]`) | **Untested: I can't cut Wi-Fi.** Not seen under a stuck upload (S8) |
+| Outage cause | After 2 min offline: Wi-Fi state + a `generate_204` check page → Wi-Fi down / login page / no internet / Telegram only; added to the offline summary | no | — | Task 4 (0.4.x); waits for a natural outage, or the phone's Wi-Fi switched off for 3+ min |
+| IP and network name in `/status` and back-online | `Wi-Fi: <network>, IP <address>, -77 dBm (3/4)` | no | — | Task 4; phone check pending |
 | Late commands | After > 2 min: settings and read-only commands run, `/snapshot`, `/clip`, `/sshd`, tests skipped with a reply | no | — | **Untested: I can't cut Wi-Fi.** Unit-tested (`LateCommandsTest`); the 2026-11-08 `skipped old command` lines are the old bug (S9) |
 
 Accepted risk for the untested paths: docs/DECISIONS.md (Task 3 close) and docs/INCIDENTS.md S15.

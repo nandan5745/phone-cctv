@@ -13,7 +13,7 @@
 | 1 Test infrastructure | ✅ done 2026-11-08 |
 | 2 Battery + CPU heat levels, heat pause | ✅ done 2026-11-08 · follow-up (CPU 52/55/60, resume 55) ✅ phone-checked 2026-11-11 |
 | 3 Alerts survive outages, two send lanes, late commands, offline summary | ✅ done 2026-11-11, **partly untested** (accepted risk) |
-| 4 Network diagnostics + IP in `/status` | 🔄 current |
+| 4 Network diagnostics + IP in `/status` | 🔄 code pushed, phone check pending |
 | 5 Storage dashboard + daily summary | ⏳ |
 | 6 Housekeeping (drop `QUICKBOOT_POWERON`, uninstall Termux:Boot) + Phase 5 review | ⏳ |
 | 7–22 (Phases 6–10) | ⏳ |
@@ -29,7 +29,7 @@ The owner can't cut the Wi-Fi, so the planned outage re-test can't be run.
 
 ## Exact next step
 
-1. Start **Task 4** (`task-start docs/plans/phases-5-10.md 4`, docs/WORKFLOW.md §1): TDD `core/NetDiag.kt`.
+1. **Task 4:** code pushed (NetDiag, IP in `/status` and back-online, outage cause after 2 min offline; 34 tests). Install the new APK; phone check: `/status` shows `Wi-Fi: <network>, IP <address>, … dBm`; the back-online message shows the IP. The cause line waits for a natural outage (or the phone's own Wi-Fi switched off for 3+ min, if the owner can). Then `task-done 4` with BASE `ca62381`.
 2. When the owner has set a screen PIN (secure start-up "No"): one reboot test without unlocking; quote the `started: phone rebooted (first signal: …)` line in docs/FEATURES.md and docs/PHONE.md.
 
 ## Waiting on the owner

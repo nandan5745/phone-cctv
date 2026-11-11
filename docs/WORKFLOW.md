@@ -22,7 +22,7 @@
 5. Commit + push → CI tests and builds the APK.
 6. Deploy (section 3), do the phone check, quote the log lines or Telegram message in the ledger.
 7. Finish: `…/executing-plans/scripts/task-done docs/plans/phases-5-10.md <N> <BASE> -- scripts/jvmtest.sh`.
-8. Same commit or the next: tick the plan steps, update `docs/STATUS.md`, and any of PHONE / DECISIONS / INCIDENTS / ARCHITECTURE that changed, plus the local memory files.
+8. Same commit or the next: tick the plan steps, update `docs/STATUS.md`, `docs/FEATURES.md` (row + evidence for every feature added or tested), and any of PHONE / DECISIONS / INCIDENTS / ARCHITECTURE that changed, plus the local memory files.
 
 Every deviation from the plan is a `Ruling:` line in the ledger and a row in `docs/DECISIONS.md`.
 

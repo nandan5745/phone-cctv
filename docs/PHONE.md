@@ -53,6 +53,7 @@ Only two temperature sensors exist. No gyroscope, compass or barometer.
 | **Percentage is unreliable** | Showed 100% "Full" at 3.31–3.38 V (nearly empty) on the charger [2026-11-06]; showed 80% at the moment it died [2026-11-07] |
 | **Voltage is the honest signal** | Shutdown at ~3.15 V; app warns below 3.6 V |
 | **Battery is worn** | Unplugged from full: died in under 1 hour with the camera running (3.96 → 3.73 → 3.30 → 3.15 V) [2026-11-07 01:35–02:32] |
+| Second drain test | Unplugged at 4.15 V "100%" (2026-11-09 ~20:00), last log line 2026-11-10 01:07:58 at 3.18 V "80%": **~5 h** with the camera running (owner's test; much longer than the first, cause not known) |
 | **Temperature follows the charger** | 25.7 °C during a 4.37 V charging pulse vs 28.6–30.1 °C at 4.03–4.15 V, jumps every minute; flat ~29 °C through night, day and direct sun [2026-11-08] |
 | Charger type matters | Old adapter was detected as **USB (500 mA)** and the phone shut down while "charging"; new adapter + cable is detected as **AC** and holds 4.1–4.37 V [2026-11-06] |
 | Charging current | Not reported by Android here (`BATTERY_PROPERTY_CURRENT_NOW` empty) |
@@ -84,6 +85,7 @@ Only two temperature sensors exist. No gyroscope, compass or barometer.
 | START_STICKY doesn't restart a killed service | 1-minute AlarmManager check |
 | `MY_PACKAGE_REPLACED` works | Restarts after every update |
 | Android settings can't be read from Termux ("Error while accessing settings provider") | Check settings on the phone itself |
+| Package installer: tapping **Open** instead of **Done** after an update | App starts as `started: app opened by hand` instead of `app updated`; both fine |
 
 ## Termux
 
@@ -102,7 +104,10 @@ Only two temperature sensors exist. No gyroscope, compass or barometer.
 | Setting | Status |
 |---|---|
 | Unknown sources (install APKs) | On |
-| Keep Wi-Fi on during sleep: Always | Recommended; not verified (settings unreadable over SSH) |
-| Screen lock PIN | To do / verify (Task 11) |
-| Bluetooth, NFC, location, mobile data off | To do / verify (Task 11) |
+| Keep Wi-Fi on during sleep | **Always** (owner checked 2026-11-11) |
+| Bluetooth | Off (owner checked 2026-11-11) |
+| Location | Off (owner checked 2026-11-11) |
+| NFC | Not present on this phone |
+| Screen lock PIN | **Not set yet** (2026-11-11); owner will add one with "Secure start-up: No" so the phone boots without the PIN. After that: one reboot test without unlocking, expecting `started: phone rebooted (first signal: …)` |
+| Mobile data | To verify (Task 11) |
 | Unused preinstalled apps disabled | To do |

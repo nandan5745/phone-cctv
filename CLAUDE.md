@@ -8,7 +8,7 @@ motion camera with a Telegram bot. Built only on GitHub Actions; installed over 
 2. `docs/plans/phases-5-10.md`: the task list (ticked steps = done); the ledger is
    `.superpowers/sdd/phases-5-10/progress.md` (local, git-ignored).
 3. `docs/WORKFLOW.md`: how to run a task: tests, deploy, logs, skills.
-4. Then as needed: `docs/ARCHITECTURE.md`, `docs/PHONE.md`, `docs/INCIDENTS.md`,
+4. Then as needed: `docs/FEATURES.md`, `docs/ARCHITECTURE.md`, `docs/PHONE.md`, `docs/INCIDENTS.md`,
    `docs/DECISIONS.md`, `docs/ROADMAP.md`.
 
 ## Docs map
@@ -18,6 +18,7 @@ motion camera with a Telegram bot. Built only on GitHub Actions; installed over 
 | docs/ROADMAP.md | Approved Phases 5–10 plan and phase status |
 | docs/plans/phases-5-10.md | Step-by-step tasks with tests and phone checks |
 | docs/ARCHITECTURE.md | Pipeline, files, threads, lifecycle, config keys, commands, log prefixes, CI |
+| docs/FEATURES.md | Every feature/command: how it works, tested on the phone or not, evidence |
 | docs/PHONE.md | Measured phone facts and quirks |
 | docs/DECISIONS.md | Every decision with reason and cost if wrong |
 | docs/INCIDENTS.md | Bugs/incidents: evidence, cause, fix, status |
@@ -40,7 +41,8 @@ motion camera with a Telegram bot. Built only on GitHub Actions; installed over 
 
 ## Keep docs current (same commit as the task)
 - After every task: update docs/STATUS.md and tick the plan's steps.
-- New phone fact → docs/PHONE.md · decision or ledger ruling → docs/DECISIONS.md ·
+- Feature added or tested on the phone → docs/FEATURES.md (row + evidence) ·
+  new phone fact → docs/PHONE.md · decision or ledger ruling → docs/DECISIONS.md ·
   bug/incident → docs/INCIDENTS.md · design change → docs/ARCHITECTURE.md.
 - Update the local memory files (project status) too.
 

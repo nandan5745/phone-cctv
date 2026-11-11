@@ -70,7 +70,7 @@ Phone check = `scripts/deploy.sh` (unlock phone, tap Install, Done) then the lis
 - [x] **Step 4: Run** `scripts/jvmtest.sh` → `OK (5 tests)`; push; `gh run watch` → green, log shows `testReleaseUnitTest`
 - [x] **Step 5: Commit** `test: core package, JVM test runner, MotionDetector tests`
 
-### Task 2: BatteryMonitor (thermal + existing battery warnings) ✅ (2026-11-08; CPU follow-up phone check pending)
+### Task 2: BatteryMonitor (thermal + existing battery warnings) ✅ (2026-11-08; CPU follow-up phone-checked 2026-11-11)
 
 **Files:**
 - Create: `core/BatteryMonitor.kt`, `test/.../core/BatteryMonitorTest.kt`
@@ -104,9 +104,9 @@ Phone check = `scripts/deploy.sh` (unlock phone, tap Install, Done) then the lis
 
 **Task 2 follow-ups**
 - 2026-11-08 (user-approved): battery temperature follows the charger, so the processor sensor (`sensor_arm`) is watched too through `core/HeatMonitor.kt`; camera pauses while either sensor is in EMERGENCY; `/testtemp cpu C`. First defaults 70/80/85, resume 75.
-- 2026-11-11 (user-measured): CPU thresholds lowered to **warn 52 / critical 55 / emergency 60 °C, resume 55** (log Nov 8–11: normal 37–50 °C, ~10% of minutes at ~50, 51–54 only ~35 min in 3 days; 61.5–63 °C in direct sun). Phone check: log `config: … cpu=52.0/55.0/60.0/55.0°C`; `/testtemp cpu 61` → "🚨 Phone CPU 61.0 °C: camera stopped", camera back once the real reading is below 55.
+- 2026-11-11 (user-measured): CPU thresholds lowered to **warn 52 / critical 55 / emergency 60 °C, resume 55** (log Nov 8–11: normal 37–50 °C, ~10% of minutes at ~50, 51–54 only ~35 min in 3 days; 61.5–63 °C in direct sun). Phone check: log `config: … cpu=52.0/55.0/60.0/55.0°C`; `/testtemp cpu 61` → "🚨 Phone CPU 61.0 °C: camera stopped", camera back once the real reading is below 55. **Done 2026-11-11 (0.4.17):** `22:47:47 config: … cpu=52.0/55.0/60.0/55.0°C`; `22:49:36 heat: cpu 61.0°C, pausing camera` → `22:49:37 camera stopped`; `22:51:48 heat: cpu cooled to 41.017°C, resuming camera` → `22:51:49 camera started 640x480`.
 
-### Task 3: Alerts survive outages + offline summary (+ fixes from the 2026-11-08 incidents) 🔄 (code done; phone re-test pending)
+### Task 3: Alerts survive outages + offline summary (+ fixes from the 2026-11-08 incidents) ✅ (done 2026-11-11, partly untested on the phone)
 
 Evidence: 18:12 `/snapshot` photo upload failed with `EOFException` 3+ times and every text reply waited behind it until ~18:26; outages 20:18–22:59 and 23:48–03:29 made `/record off`, `/alerts off`, `/videos off` arrive ~80 min late and the 2-minute rule skipped them silently; 22 alert photos/videos were dropped after 8 tries.
 
@@ -123,8 +123,8 @@ Evidence: 18:12 `/snapshot` photo upload failed with `EOFException` 3+ times and
 - [x] **Step 2: Run** → FAIL
 - [x] **Step 3: Implement**; in `Bot.pollLoop` call `onFailure`/`onSuccess`; on an `Outage` send `"📴 Was offline HH:mm–HH:mm (N min), M motions while offline"`
 - [x] **Step 4: Run** → pass
-- [ ] **Step 5: Phone check (re-test, owner):** `/alerts on`, `/record on`; cut the home internet (router WAN or router off); walk past; from mobile data send `/videos off` and `/snapshot`; keep the internet off **≥ 3 more minutes after sending** (so they arrive > 2 min old); restore → Telegram: the delayed alert photo, "📴 Was offline …, ≥1 motions while offline", "Motion videos: OFF" + log `running late command '/videos off'`, "⏭ Skipped /snapshot …" + log `skipped old command`; log has no `queue full`. Then `/videos on`. (A first cut test on 2026-11-11 had alerts OFF and fresh commands, so it proved only the outage summary.)
-- [x] **Step 6: Commit**: code shipped in `47824b0` (0.4.16). Closing Task 3 = ledger evidence + `task-done` + a docs commit (STATUS, plan ticks, INCIDENTS O2 → solved).
+- [x] **Step 5: Phone check — partly done, rest accepted as untested (owner, 2026-11-11: the Wi-Fi can't be cut).** Seen: outage summaries incl. motion count (`outage 14:09-17:51, 3 motions`), short text/media retries. Not seen: alert delivered after a long outage, `running late command`, new-style `skipped old command` + reply, lanes under a stuck upload (docs/INCIDENTS.md S15). The planned re-test, kept for a future natural outage: `/alerts on`, `/record on`; cut the home internet (router WAN or router off); walk past; from mobile data send `/videos off` and `/snapshot`; keep the internet off **≥ 3 more minutes after sending** (so they arrive > 2 min old); restore → Telegram: the delayed alert photo, "📴 Was offline …, ≥1 motions while offline", "Motion videos: OFF" + log `running late command '/videos off'`, "⏭ Skipped /snapshot …" + log `skipped old command`; log has no `queue full`. Then `/videos on`. (A first cut test on 2026-11-11 had alerts OFF and fresh commands, so it proved only the outage summary.)
+- [x] **Step 6: Commit**: code shipped in `47824b0` (0.4.16). Closed 2026-11-11 (docs commit; INCIDENTS O2 → S15).
 
 ### Task 4: Network diagnostics + IP in status
 
@@ -138,7 +138,7 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 - [ ] **Step 1: Tests:** `formatsLittleEndianIp` (`0x097100CB` → `"203.0.113.9"`, a documentation-only address); `classifyWifiDown` (`classify(false, 204)` and `classify(false, null)` → `WIFI_DOWN`); `classifyPortal` (`classify(true, 200)`, `classify(true, 302)` → `CAPTIVE_PORTAL`); `classifyNoInternet` (`classify(true, null)` → `NO_INTERNET`); `classifyTelegramDown` (`classify(true, 204)` → `TELEGRAM_DOWN`)
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement**; probe runs once on the poller thread after 2 min offline. **Step 4: Run** → pass
-- [ ] **Step 5: Phone check:** `/status` Wi-Fi line changes from `Wi-Fi: -77 dBm (3/4)` to `Wi-Fi: <ssid>, IP <addr>, -77 dBm (3/4)`; "back online" shows the IP; repeat Task 3 outage → summary says `(cause: no internet)`
+- [ ] **Step 5: Phone check:** `/status` Wi-Fi line changes from `Wi-Fi: -77 dBm (3/4)` to `Wi-Fi: <ssid>, IP <addr>, -77 dBm (3/4)`; "back online" shows the IP; next real outage (or a Wi-Fi toggle on the phone, if the owner can) → summary names the cause, e.g. `(cause: no internet)`
 - [ ] **Step 6: Commit** `feat: network diagnostics, IP in status`
 
 ### Task 5: Storage dashboard + daily summary

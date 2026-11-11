@@ -72,6 +72,7 @@ Format: **decision** (date): why · rejected alternatives · cost if wrong.
 | 2 (follow-up) | No unit test for the new CPU defaults (Config is Android; tested in Task 20) | a typo shows only on the phone |
 | 3 | Plan amended (owner OK): two lanes, late settings applied, every try logged | — |
 | 3 | Text also retries until delivered | stale reply arrives late |
+| 3 (close, 11-11) | **Closed "done, partly untested"** (owner): the owner can't cut the Wi-Fi, so retry-until-delivered across a long outage, late settings applied, late actions skipped with a reply and the two lanes under a stuck upload stay unproven on the phone; unit tests + the next natural outage cover them (INCIDENTS S15) | an alert or a late `/record off` misbehaves during a real outage and is only found then |
 | 4 (pre-start, 11-11) | Outage cause enum gains `TELEGRAM_DOWN` (probe 204 = internet fine, Telegram not) | one more case to test |
 
 ## Rejected tools

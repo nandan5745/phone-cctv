@@ -15,6 +15,7 @@ reboots, updates, crashes and network outages. It opens no ports: only outgoing 
 |---|---|
 | [docs/STATUS.md](docs/STATUS.md) | Where the project is right now and the next step |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | The plan for Phases 5–10 and phase status |
+| [docs/FEATURES.md](docs/FEATURES.md) | Every feature and command, and whether it's tested on the phone |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it works: pipeline, files, threads, config, commands, logs |
 | [docs/PHONE.md](docs/PHONE.md) | Measured facts and quirks of this phone |
 | [docs/INCIDENTS.md](docs/INCIDENTS.md) | Bugs and incidents, with evidence and fixes |

@@ -18,7 +18,7 @@ Every feature and command so far (Phases 1–5). **Tested on phone?** yes = seen
 | Battery + CPU log | One `battery:` line per minute incl. CPU temperature | yes | 2026-11-11 22:49:48 `battery: 100% full (AC) 25.1°C 4.37V health=good \| cpu 61.0°C` | |
 | Latest frame `test.jpg` | Overwritten every 60 s | yes | `/sdcard/cctv/test.jpg` modified 2026-11-11 22:48 | |
 | Log file with rotation | `log.txt` up to 1 MB, then `log.1.txt` | yes | 2026-11-12 14:11: `log.1.txt` 1,000,045 bytes, new `log.txt` started | |
-| Config import | `/sdcard/cctv/config.json` copied into private storage, public copy deleted | yes | 2026-11-06 20:16:01 `imported config.json into private storage, deleted /sdcard copy` | |
+| Config import | `/sdcard/cctv/config.json` copied into private storage, public copy deleted; since Task 9 only on first setup or the owner's `/reload` (otherwise deleted + owner warned) | yes (import) / no (refusal path) | 2026-11-06 20:16:01 `imported config.json into private storage, deleted /sdcard copy` | |
 | Signed CI build, install over SSH | GitHub Actions builds with the fixed key; `scp` + installer | yes | 2026-11-11 22:47:47 `process started, version 0.4.17` | Owner unlocks and taps Install |
 
 ## Telegram bot (Phase 3)

@@ -4,6 +4,7 @@
 package com.nandan.cctv
 
 import android.content.Context
+import com.nandan.cctv.core.ConfigImport
 import org.json.JSONObject
 import java.io.File
 
@@ -59,10 +60,25 @@ class Config private constructor(j: JSONObject) {
             "summary=${dailySummaryHour}h telegram=${if (telegramBotToken.isNotEmpty() && telegramUserId != 0L) "set" else "not set"}"
 
     companion object {
-        fun load(ctx: Context): Config {
+        /** [ignoredImport] = a config.json on /sdcard was deleted without importing it. */
+        class Loaded(val config: Config, val ignoredImport: Boolean)
+
+        /**
+         * (docs/SECURITY.md) Any app can write /sdcard and open this app, so /sdcard/cctv/config.json is
+         * imported only on first setup (no bot token yet) or on the owner's /reload from Telegram.
+         */
+        fun load(ctx: Context, fromTelegramReload: Boolean): Loaded {
             val public = File(FileLog.dir, "config.json")
             val private = File(ctx.filesDir, "config.json")
-            if (public.exists()) {
+            val hasToken = try {
+                private.exists() && JSONObject(private.readText()).optString("telegramBotToken", "").isNotEmpty()
+            } catch (e: Exception) { false }
+            var ignored = false
+            if (public.exists() && !ConfigImport.allowed(hasToken, fromTelegramReload)) {
+                ignored = true
+                val gone = public.delete()
+                FileLog.w("config.json on /sdcard ignored (only /reload from Telegram imports once a token is set); ${if (gone) "deleted" else "could not delete it"}")
+            } else if (public.exists()) {
                 try {
                     val text = public.readText()
                     JSONObject(text) // check it parses before replacing the old one
@@ -81,7 +97,7 @@ class Config private constructor(j: JSONObject) {
                 Config(JSONObject())
             }
             FileLog.i("config: $cfg")
-            return cfg
+            return Loaded(cfg, ignored)
         }
     }
 }

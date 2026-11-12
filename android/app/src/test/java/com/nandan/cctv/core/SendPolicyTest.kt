@@ -31,4 +31,11 @@ class SendPolicyTest {
     fun missingFileDropped() {
         assertEquals(SendOutcome.DROP, afterSendFailure(null, fileMissing = true))
     }
+
+    @Test
+    fun recipientsResolvedAtSendTime() {
+        // Owner 1, members 2 and 3. 2 already got it; 3 was revoked during the retries; 4 was just added.
+        assertEquals(listOf(1L, 4L), stillToSend(current = listOf(1L, 4L), delivered = setOf(2L)))
+        assertEquals(emptyList<Long>(), stillToSend(listOf(1L, 2L), setOf(1L, 2L)))
+    }
 }

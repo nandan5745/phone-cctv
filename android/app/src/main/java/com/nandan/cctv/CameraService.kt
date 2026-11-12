@@ -35,6 +35,8 @@ import android.view.SurfaceView
 import android.view.WindowManager
 import com.nandan.cctv.core.BatteryEvent
 import com.nandan.cctv.core.BatteryMonitor
+import com.nandan.cctv.core.ClipSlot
+import com.nandan.cctv.core.Routing
 import com.nandan.cctv.core.BatterySample
 import com.nandan.cctv.core.HeatMonitor
 import com.nandan.cctv.core.DailyStats
@@ -123,9 +125,9 @@ class CameraService : Service(), Bot.Control {
     // Telegram requests and alerts (camera thread).
     private var rotation = 0              // degrees to turn camera images upright
     private val snapshotFor = mutableSetOf<Long>() // chats waiting for a /snapshot
-    private var clipWantedSeconds = 0     // > 0: a /clip is waiting to start
-    private var clipFor = 0L              // chat that asked for it
-    private var sendClipTo = emptyList<Long>() // who gets the clip being recorded (none, the /clip asker, or everyone)
+    private val clipSlot = ClipSlot()     // one /clip at a time (Bot calls request() on tg-poll)
+    private var clipToChat = 0L           // the clip being recorded goes to this chat (a /clip) …
+    private var clipToAll = false         // … or to everyone (motion clip with /videos on)
     private var lastAlertAt = -1L
 
     // Battery watcher state (camera thread).
@@ -189,7 +191,8 @@ class CameraService : Service(), Bot.Control {
         FileLog.i("service created")
         running = true
         startForeground(NOTIFICATION_ID, buildNotification())
-        config = Config.load(this)
+        val loaded = Config.load(this, fromTelegramReload = false)
+        config = loaded.config
         batteryMonitor = newBatteryMonitor()
         cpuHeat = newCpuHeat()
         cpuZone = File("/sys/class/thermal").listFiles()
@@ -226,6 +229,7 @@ class CameraService : Service(), Bot.Control {
 
         bot = Bot(this, File(filesDir, "users.json"))
         bot.configure(config)
+        if (loaded.ignoredImport) warnIgnoredImport()
         scheduleWatchdogAlarm()
         startSshdOncePerBoot()
 
@@ -254,7 +258,7 @@ class CameraService : Service(), Bot.Control {
                 "Battery ${BatteryInfo.read(this)?.text() ?: "?"}\n" +
                 "Recording ${onOff(recordOn)}, alerts ${onOff(alertsOn)}, videos ${onOff(videosOn)}" }
         } else if (intent?.action == ACTION_OPEN) {
-            reload() // opening the app again = reload settings
+            reloadConfig(fromTelegram = false) // opening the app again = reload settings (no /sdcard import once set up)
         }
         // Other starts (the 1-minute alarm while we're running) need nothing.
         return START_STICKY
@@ -394,15 +398,13 @@ class CameraService : Service(), Bot.Control {
             snapshotFor.clear()
         }
 
-        if (clipWantedSeconds > 0) {
-            val secs = clipWantedSeconds
-            clipWantedSeconds = 0
+        clipSlot.take()?.let { req ->
             if (Storage.freeMB() < config.minFreeMB) {
-                bot.sendTo(clipFor, "Not enough free storage to record (${Storage.freeMB()} MB free).")
+                bot.sendTo(req.chatId, "Not enough free storage to record (${Storage.freeMB()} MB free).")
             } else {
-                startRecording(File(Storage.clipsDir, fileTime.format(Date()) + ".mp4"), secs, sendTo = listOf(clipFor))
+                startRecording(File(Storage.clipsDir, fileTime.format(Date()) + ".mp4"), req.seconds, toChat = req.chatId, toAll = false)
                 if (recorder != null) return@PreviewCallback // camera now belongs to MediaRecorder
-                bot.sendTo(clipFor, "Recording failed, see /log")
+                bot.sendTo(req.chatId, "Recording failed, see /log")
                 return@PreviewCallback // buffers were re-attached by resumeAfterRecording
             }
         }
@@ -465,11 +467,11 @@ class CameraService : Service(), Bot.Control {
             // Send the video too (after the photo), with the same cooldown as alerts.
             val sendVideo = videosOn && (lastVideoAt < 0 || now - lastVideoAt >= cooldownMs)
             if (sendVideo) lastVideoAt = now
-            startRecording(File(Storage.clipsDir, "$name.mp4"), config.clipSeconds, sendTo = if (sendVideo) bot.recipients() else emptyList())
+            startRecording(File(Storage.clipsDir, "$name.mp4"), config.clipSeconds, toChat = 0L, toAll = sendVideo)
         }
     }
 
-    private fun startRecording(file: File, seconds: Int, sendTo: List<Long>) {
+    private fun startRecording(file: File, seconds: Int, toChat: Long, toAll: Boolean) {
         val c = camera ?: return
         val r = MediaRecorder()
         try {
@@ -498,7 +500,8 @@ class CameraService : Service(), Bot.Control {
             recorder = r
             recordingFile = file
             recordStartedAt = SystemClock.elapsedRealtime()
-            sendClipTo = sendTo
+            clipToChat = toChat
+            clipToAll = toAll
             // Backup in case the max-duration event never comes.
             cam.postDelayed(recordTimeout, seconds * 1000L + 5_000L)
         } catch (e: Exception) {
@@ -537,14 +540,16 @@ class CameraService : Service(), Bot.Control {
                 statClips++
                 daily.clips++
                 FileLog.i("clip saved ${f.name} ${f.length() / 1024} KB ${secs}s")
-                for (chat in sendClipTo) bot.sendVideo(chat, f, "🎥 ${f.nameWithoutExtension} (${secs}s)")
+                val caption = "🎥 ${f.nameWithoutExtension} (${secs}s)"
+                if (clipToAll) bot.broadcastVideo(f, caption) else if (clipToChat != 0L) bot.sendVideo(clipToChat, f, caption)
             } else {
                 f.delete()
                 noteRecordFailure()
-                for (chat in sendClipTo) bot.sendTo(chat, "Recording failed, see /log")
+                if (clipToAll) bot.send("Recording failed, see /log") else if (clipToChat != 0L) bot.sendTo(clipToChat, "Recording failed, see /log")
             }
         }
-        sendClipTo = emptyList()
+        clipToChat = 0L
+        clipToAll = false
         resumeAfterRecording()
         Storage.enforceCap(config.storageCapMB)
     }
@@ -811,8 +816,10 @@ class CameraService : Service(), Bot.Control {
     // Called on the "tg-poll" thread; the work is posted to the camera thread.
 
     override fun snapshot(chatId: Long) { cam.post { snapshotFor += chatId } } // taken from the next frame
-    override fun clip(seconds: Int, chatId: Long) { cam.post { clipWantedSeconds = seconds.coerceIn(1, MAX_CLIP_S); clipFor = chatId } }
-    override fun status(chatId: Long) { cam.post { bot.sendTo(chatId, statusText()) } }
+    override fun clip(seconds: Int, chatId: Long): Boolean = clipSlot.request(chatId, seconds.coerceIn(1, MAX_CLIP_S))
+    override fun status(chatId: Long, full: Boolean) {
+        cam.post { statusText().let { bot.sendTo(chatId, if (full) it else Routing.memberStatus(it)) } }
+    }
     override fun setRecording(on: Boolean) { recordOn = on; prefs().edit().putBoolean("record", on).apply() }
     override fun setAlerts(on: Boolean) { alertsOn = on; prefs().edit().putBoolean("alerts", on).apply() }
     override fun sshd() {
@@ -851,14 +858,24 @@ class CameraService : Service(), Bot.Control {
         // A clean stop: START_STICKY won't restart this, only the 1-minute alarm will.
         main.postDelayed({ FileLog.w("teststop: stopping service"); stopSelf() }, 2_000)
     }
-    override fun reload() {
+    /** /reload from Telegram (the owner): the only way to import a new /sdcard config once a token is set. */
+    override fun reload() = reloadConfig(fromTelegram = true)
+
+    private fun reloadConfig(fromTelegram: Boolean) {
         cam.post {
-            config = Config.load(this)
+            val loaded = Config.load(this, fromTelegram)
+            config = loaded.config
             bot.configure(config)
             if (!heatPaused) { batteryMonitor = newBatteryMonitor(); cpuHeat = newCpuHeat() } // new thresholds; keep state while paused
+            if (loaded.ignoredImport) warnIgnoredImport()
             bot.send("Settings reloaded.")
         }
     }
+
+    private fun warnIgnoredImport() = bot.send(
+        "⚠️ A config.json appeared on /sdcard/cctv and was deleted without importing it. " +
+            "Only /reload from Telegram imports settings now. If that wasn't you, something on the phone wrote it."
+    )
 
     // ---------------------------------------------------------------- overlay fallback
 

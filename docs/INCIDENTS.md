@@ -101,3 +101,7 @@ Each entry: symptom, evidence, root cause, fix, commit, status. Newest open ones
 - **Cause (likely):** Termux:Boot shares Termux's user ID; removing it changed that shared ID's storage access for the running processes. Unproven (no root).
 - **Fix:** reboot. If it ever recurs without a reboot: `termux-setup-storage` on the phone.
 
+### S19. Another app could take over the bot through the /sdcard config (found in review, 2026-11-12)
+- **Finding:** manual security pass (Task 9): the app imported `/sdcard/cctv/config.json` on every start and every app open, and `MainActivity` is exported. Any installed app with storage access could write its own token and owner ID there and open the app. Not seen; the phone is kept app-free.
+- **Fix:** import only on first setup (no token yet) or the owner's `/reload`; otherwise delete it and warn the owner (`core/ConfigImport`, 3 tests). Recovery from a dead token: clear app data or reinstall, then `scripts/set-telegram.sh` (docs/SECURITY.md).
+

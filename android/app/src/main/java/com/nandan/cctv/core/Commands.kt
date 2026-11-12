@@ -12,6 +12,12 @@ object Commands {
     /** What a member (roommate) may use; everything else is owner-only. */
     val MEMBER = setOf("/start", "/help", "/snapshot", "/clip", "/last", "/status")
 
+    /** Every command the bot knows; anything else gets "Unknown command" (also from members). */
+    val KNOWN = MEMBER + setOf(
+        "/record", "/alerts", "/videos", "/log", "/sshd", "/summary", "/reload",
+        "/allow", "/revoke", "/users", "/testkill", "/teststop", "/testtemp",
+    )
+
     fun parse(text: String?): Command? {
         val t = text?.trim() ?: return null
         if (!t.startsWith("/")) return null

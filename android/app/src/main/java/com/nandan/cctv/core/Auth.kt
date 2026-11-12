@@ -48,9 +48,12 @@ class Auth(private val ownerId: Long, members: List<User> = emptyList()) {
             if (json == null) return Auth(ownerId)
             return try {
                 val arr = JSONObject(json).optJSONArray("members") ?: return Auth(ownerId)
-                val list = (0 until arr.length()).map {
-                    val o = arr.getJSONObject(it)
-                    User(o.getLong("id"), o.optString("name", "?"), Role.MEMBER)
+                // A malformed entry is skipped; it must not cost every other member their access.
+                val list = (0 until arr.length()).mapNotNull {
+                    val o = arr.optJSONObject(it) ?: return@mapNotNull null
+                    if (!o.has("id")) return@mapNotNull null
+                    val id = o.optLong("id", 0L).takeIf { v -> v != 0L } ?: return@mapNotNull null
+                    User(id, o.optString("name", "?"), Role.MEMBER)
                 }
                 Auth(ownerId, list)
             } catch (e: Exception) {

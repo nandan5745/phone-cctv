@@ -57,8 +57,10 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `LateCommands.kt` | Which late commands still run (settings, read-only) and which are skipped; what counts as a command. | `LateCommandsTest` (6) |
 | `Auth.kt` | Owner + approved members, private chats only; JSON; corrupt JSON → owner only (wired in Task 8). | `AuthTest` (7) |
 | `Commands.kt` | Parse `/name@bot arg rest`; members may use only `/start /help /snapshot /clip /last /status`. | `CommandsTest` (5) |
+| `ClipSlot.kt` | One `/clip` request at a time; a second asker is told to wait. | `ClipSlotTest` (2) |
+| `ConfigImport.kt` | `/sdcard` config imported only on first setup or the owner's `/reload`. | `ConfigImportTest` (3) |
 | `RateLimiter.kt` | At most N events per sliding window per user id; forgets expired ids beyond 256. | `RateLimiterTest` (4) |
-| `Routing.kt` | Message → ignore (not a private chat) / stranger notice / "owner only" / run; the stranger notice text. | `RoutingTest` (5) |
+| `Routing.kt` | Message → ignore (not a private chat) / stranger notice / unknown command / "owner only" / run; member rate limit (owner exempt); member `/status` without the Wi-Fi line; stranger notices (once a day each, ≤ 5 an hour). | `RoutingTest` (9) |
 | `SendPolicy.kt` | After a failed send: retry (network, 429, 5xx) or drop (other 4xx, missing file). | `SendPolicyTest` (5) |
 | `TestTemp.kt` | `/testtemp` argument parsing within each monitor's valid range. | `TestTempTest` (4) |
 | `StorageMath.kt` | MB/day from the last 3 complete days; days until the size cap starts deleting, or at the cap the days of history it holds (`storageOutlook`). | `StorageMathTest` (6) |
@@ -90,7 +92,7 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 
 | Event | What happens |
 |---|---|
-| App opened by hand | `MainActivity` → service with `ACTION_OPEN`: first start, or settings reload. |
+| App opened by hand | `MainActivity` → service with `ACTION_OPEN`: first start, or settings reload. A `/sdcard` config is imported only if the app has no token yet; otherwise it is deleted and the owner warned. |
 | Phone boots | `BOOT_COMPLETED` never arrives on this phone. `WIFI_STATE_CHANGED` (or network/charger/unlock/storage events) wakes `BootReceiver` within seconds; if the service isn't running it starts it. Reason "phone rebooted (first signal: …)". |
 | App updated | `MY_PACKAGE_REPLACED` → service starts by itself ("app updated"). |
 | Service/process dies | Android's START_STICKY restart doesn't happen on this phone. A **1-minute AlarmManager** check starts the service if it isn't running. |
@@ -135,20 +137,20 @@ Change settings: write `/sdcard/cctv/config.json` over SSH, then open the app (`
 
 ## 7. Telegram commands
 
-The owner (`telegramUserId`) and members added with `/allow` get answers, in private chats only. Strangers get no reply; the owner gets "👤 Unknown user … /allow N" once a day per stranger. 10 messages a minute per user. Motion alert photos and videos go to everyone; warnings, back-online, outage and daily summaries go to the owner only.
+The owner (`telegramUserId`) and members added with `/allow` get answers, in private chats only. Strangers get no reply; the owner gets "👤 Unknown user … /allow N" once a day per stranger. 10 messages a minute per member (the owner is not limited, so a backlog after an outage all runs). Alerts are one queue item each; recipients are read when it is sent. Motion alert photos and videos go to everyone; warnings, back-online, outage and daily summaries go to the owner only.
 
 | Command | What it does | Who | Runs if it arrives > 2 min late? |
 |---|---|---|---|
 | `/start`, `/help` | Command list | everyone | yes |
 | `/snapshot` | Photo now | member | no (skipped, you're told) |
-| `/clip N` | Record N s (1–30) and send it | member | no |
+| `/clip N` | Record N s (1–30) and send it; "Busy …" if another `/clip` is waiting | member | no |
 | `/last` | Newest saved clip | member | yes |
-| `/status` | Uptime, battery, temps, storage, switches, RAM, Wi-Fi (network, IP, signal), camera | member | yes |
+| `/status` | Uptime, battery, temps, storage, switches, RAM, Wi-Fi (network, IP, signal; owner only), camera | member | yes |
 | `/record on\|off` | Record clips on motion | owner | yes |
 | `/alerts on\|off` | Photo alerts on motion | owner | yes |
 | `/videos on\|off` | Also send the motion clip | owner | yes |
 | `/log` | Last 30 log lines | owner | yes |
-| `/reload` | Re-read settings | owner | yes |
+| `/reload` | Re-read settings; the only way to import a new `/sdcard` config once a token is set | owner | yes |
 | `/summary` | Counts since the last daily summary + storage line (no reset) | owner | yes |
 | `/allow ID` | Add a member (they get "✅ You can now use this camera") | owner | yes |
 | `/revoke ID` | Remove a member | owner | yes |

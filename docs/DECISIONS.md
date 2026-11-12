@@ -87,6 +87,10 @@ Format: **decision** (date): why · rejected alternatives · cost if wrong.
 | 8 | Members get motion alert photos and videos only; heat/battery warnings, back-online, outage and daily summaries stay owner-only (roadmap: "members get alerts"), though the plan said "alerts/videos/warnings" | a roommate isn't told the camera paused for heat |
 | 8 | `/allow`, `/revoke`, `/users` run when late (settings/read-only) | none |
 | 8 | RateLimiter forgets expired ids once it holds > 256 (stranger spam can't grow memory) (+1 test) | none |
+| 9 (review, owner) | Alerts: one queue item per alert, recipients read when sent (owner + current members); queue size unchanged | a member added during an outage also gets the queued alerts |
+| 9 (review, owner) | `/sdcard` config imported only on first setup or `/reload` from Telegram; else deleted + owner warned | a dead token needs clear data / reinstall + set-telegram.sh |
+| 9 (review, owner) | Owner not rate-limited; members 10/min; stranger notices ≤ 5/hour; members' `/status` hides the Wi-Fi line; one `/clip` at a time ("Busy") | — |
+| 9 | `/security-review` skill not usable on pushed `main` (no `origin/HEAD`, empty diff): manual security pass instead, noted in SECURITY.md | the skill's own checklist not applied |
 | 4 (pre-start, 11-11) | Outage cause enum gains `TELEGRAM_DOWN` (probe 204 = internet fine, Telegram not) | one more case to test |
 
 ## Rejected tools

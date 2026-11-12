@@ -201,13 +201,13 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 - [x] **Step 3: Phone check** (second Telegram account; done 2026-11-12 with the owner's roommate, IDs kept out of the repo, evidence in docs/FEATURES.md): first message → owner notice with its id, stranger gets nothing; `/allow <id>` → member gets the welcome; member `/snapshot` works, member `/record off` → "Only the owner can do that."; walk past → **both** accounts get the alert; member adds bot to a group and sends `/status` there → no reply (log `ignored … chat type group`); `/revoke <id>` → member ignored again
 - [x] **Step 4: Commit** `feat: roommates with roles and approval flow` (`bdf901a`)
 
-### Task 9: Phase 6 review + SECURITY.md draft
+### Task 9: Phase 6 review + SECURITY.md draft ✅ (done 2026-11-12)
 
 **Files:** Create `docs/SECURITY.md` (roadmap section 4 table expanded: attackers, surfaces, scenarios, protections, residual risks)
 
-- [ ] **Step 1:** Write `docs/SECURITY.md`
-- [ ] **Step 2:** `/code-review high` on Phase 6 diff, then `/security-review`; each finding → fixed (test + commit) or added to SECURITY.md "Accepted risks" with a reason
-- [ ] **Step 3: Commit** `docs: threat model; fixes from phase 6 review`
+- [x] **Step 1:** Write `docs/SECURITY.md`
+- [x] **Step 2:** `/code-review high` on Phase 6 diff, then `/security-review`; each finding → fixed (test + commit) or added to SECURITY.md "Accepted risks" with a reason. 9 + 1 findings, all fixed test-first (89 tests); security review was a manual pass (skill unusable on pushed main)
+- [x] **Step 3: Commit** `docs: threat model; fixes from phase 6 review`
 
 ---
 

@@ -64,4 +64,11 @@ class AuthTest {
             assertNull(a.roleOf(friend, "private"))
         }
     }
+
+    @Test
+    fun badEntrySkippedOthersKept() {
+        val json = "{\"members\":[{\"id\":222,\"name\":\"A\"},{\"name\":\"no id\"},{\"id\":333,\"name\":\"B\"}]}"
+        val a = Auth.fromJson(owner, json)
+        assertEquals(listOf(owner, 222L, 333L), a.users().map { it.id })
+    }
 }

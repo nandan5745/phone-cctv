@@ -64,12 +64,14 @@ Older lines are in `/sdcard/cctv/log.1.txt`. Read-only phone facts: `/sys/class/
 
 ## 5. Settings
 
-Write the whole JSON (the import replaces the private config, so include the Telegram keys) — easiest via `/reload` after editing, or:
+Write the whole JSON (the import replaces the private config, so include the Telegram keys), then send **`/reload` from Telegram**:
 ```sh
 ssh phone 'cat > /sdcard/cctv/config.json' < my-config.json
-ssh phone 'am start -n com.nandan.cctv/.MainActivity'     # works with the screen locked
+# then, in Telegram: /reload
 ```
-Telegram token + owner ID: `scripts/set-telegram.sh` (asks for the token hidden, finds your ID from a `/start` message, writes it to the phone). Keys and defaults: `docs/ARCHITECTURE.md` §6.
+Since 2026-11-12 opening the app (or any start not from Telegram) does **not** import a `/sdcard` config once a token is set; it deletes it and warns the owner (docs/SECURITY.md).
+
+Telegram token + owner ID, **first setup only**: `scripts/set-telegram.sh` (asks for the token hidden, finds your ID from a `/start` message, writes it to the phone). If the token ever dies: clear the app's data or reinstall, then run the script again (docs/SECURITY.md). Keys and defaults: `docs/ARCHITECTURE.md` §6.
 
 ## 6. Skills per phase
 

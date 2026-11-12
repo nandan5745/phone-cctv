@@ -16,3 +16,10 @@ fun afterSendFailure(httpCode: Int?, fileMissing: Boolean): SendOutcome = when {
     httpCode in 400..499 -> SendOutcome.DROP
     else -> SendOutcome.RETRY
 }
+
+/**
+ * A motion alert is one queue item; its recipients are read when it is sent (owner + current
+ * members), so revoked users get nothing afterwards and the queue holds the same number of alerts
+ * whatever the number of users. On a retry, users who already got it are skipped.
+ */
+fun stillToSend(current: List<Long>, delivered: Set<Long>): List<Long> = current.filter { it !in delivered }

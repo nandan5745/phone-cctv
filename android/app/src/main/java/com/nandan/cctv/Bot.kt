@@ -16,6 +16,8 @@ import com.nandan.cctv.core.RateLimiter
 import com.nandan.cctv.core.Role
 import com.nandan.cctv.core.Route
 import com.nandan.cctv.core.Routing
+import com.nandan.cctv.core.StrangerNotices
+import com.nandan.cctv.core.stillToSend
 import com.nandan.cctv.core.SendOutcome
 import com.nandan.cctv.core.TestTemp
 import com.nandan.cctv.core.afterSendFailure
@@ -46,8 +48,10 @@ class Bot(private val control: Control, private val usersFile: File) {
     /** What the bot can ask the camera service to do. All calls return immediately. */
     interface Control {
         fun snapshot(chatId: Long)
-        fun clip(seconds: Int, chatId: Long)
-        fun status(chatId: Long)
+        /** False if another /clip is still waiting to start. */
+        fun clip(seconds: Int, chatId: Long): Boolean
+        /** [full] = owner's view; members don't see the Wi-Fi line (network name, IP). */
+        fun status(chatId: Long, full: Boolean)
         fun setRecording(on: Boolean)
         fun setAlerts(on: Boolean)
         fun setVideos(on: Boolean)
@@ -130,7 +134,7 @@ class Bot(private val control: Control, private val usersFile: File) {
     private val authLock = Any()
     private var auth = Auth(0)
     // Poller thread only: one stranger notice per user a day, 10 commands a minute per user.
-    private val strangerNotices = RateLimiter(1, 24 * 3_600_000L)
+    private val strangerNotices = StrangerNotices()
     private val commandLimit = RateLimiter(10, 60_000)
     private val overLimitLog = RateLimiter(1, 60_000)
     private val strangerNames = LinkedHashMap<Long, String>()
@@ -192,17 +196,59 @@ class Bot(private val control: Control, private val usersFile: File) {
     fun sendPhoto(chatId: Long, jpeg: ByteArray, rotation: Int, label: String, caption: String) =
         deliver(mediaLane, "photo", chatId) { a, chat -> a.sendPhoto(chat, Photo.upright(jpeg, rotation, label), caption) }
 
-    /** Motion alert photo to every user; rotated once, on the sender thread. */
+    /** Motion alert photo to every user (one queue item); rotated once, on the sender thread. */
     fun broadcastPhoto(jpeg: ByteArray, rotation: Int, label: String, caption: String) {
         val upright = lazy { Photo.upright(jpeg, rotation, label) }
-        for (id in recipients()) deliver(mediaLane, "photo", id) { a, chat -> a.sendPhoto(chat, upright.value, caption) }
+        deliverToAll(mediaLane, "photo", null) { a, chat -> a.sendPhoto(chat, upright.value, caption) }
     }
 
     fun sendVideo(chatId: Long, file: File, caption: String) =
         deliver(mediaLane, "video", chatId, file) { a, chat -> a.sendVideo(chat, file, caption) }
 
-    fun broadcastVideo(file: File, caption: String) {
-        for (id in recipients()) sendVideo(id, file, caption)
+    fun broadcastVideo(file: File, caption: String) =
+        deliverToAll(mediaLane, "video", file) { a, chat -> a.sendVideo(chat, file, caption) }
+
+    /**
+     * One queue item for everyone. Recipients are read when it is sent (owner + current members), so
+     * a revoked user gets nothing afterwards and the queue holds the same number of alerts however
+     * many users there are. On a retry, users who already got it are skipped.
+     */
+    private fun deliverToAll(lane: ThreadPoolExecutor, what: String, file: File?, block: (TelegramApi, Long) -> Unit) {
+        if (api == null || lane.isShutdown) return
+        lane.execute {
+            val done = HashSet<Long>()
+            var delay = 5_000L
+            var attempt = 0
+            while (true) {
+                attempt++
+                val a = api ?: return@execute
+                var retry = false
+                for (chat in stillToSend(recipients(), done)) {
+                    val started = System.currentTimeMillis()
+                    try {
+                        block(a, chat)
+                        done += chat
+                    } catch (e: Exception) {
+                        val secs = (System.currentTimeMillis() - started) / 1000
+                        FileLog.w("telegram: sending $what failed (try $attempt, ${secs} s): ${a.safe(e)}")
+                        val missing = file != null && !file.exists()
+                        if (afterSendFailure((e as? TelegramHttpException)?.code, missing) == SendOutcome.DROP) {
+                            FileLog.w("telegram: dropped $what for one user: ${if (missing) "file no longer exists" else "rejected by Telegram"}")
+                            done += chat
+                        } else {
+                            retry = true
+                            break // network trouble: the others would fail the same way
+                        }
+                    }
+                }
+                if (!retry) {
+                    if (attempt > 1) FileLog.i("telegram: sent $what on try $attempt")
+                    return@execute
+                }
+                try { Thread.sleep(delay) } catch (e: InterruptedException) { return@execute }
+                delay = (delay * 2).coerceAtMost(60_000L)
+            }
+        }
     }
 
     private fun deliver(lane: ThreadPoolExecutor, what: String, chat: Long, file: File? = null, block: (TelegramApi, Long) -> Unit) {
@@ -332,7 +378,8 @@ class Bot(private val control: Control, private val usersFile: File) {
         val now = System.currentTimeMillis()
         val role = synchronized(authLock) { auth.roleOf(from, chatType) }
 
-        when (Routing.route(role, chatType, name)) {
+        val route = Routing.route(role, chatType, name)
+        when (route) {
             Route.IGNORE_NOT_PRIVATE -> {
                 FileLog.i("telegram: ignored message from $from: chat type $chatType")
                 return
@@ -342,12 +389,12 @@ class Bot(private val control: Control, private val usersFile: File) {
                 val first = fromObj?.optString("first_name")
                 if (strangerNames.size > 100) strangerNames.remove(strangerNames.keys.first())
                 strangerNames[from] = (first ?: "").trim().take(40).ifEmpty { "id $from" }
-                if (strangerNotices.tryAcquire(from, now)) send(Routing.strangerNotice(first, from))
+                if (strangerNotices.shouldNotify(from, now)) send(Routing.strangerNotice(first, from))
                 return
             }
             else -> {}
         }
-        if (!commandLimit.tryAcquire(from, now)) {
+        if (role != null && Routing.rateLimited(role) && !commandLimit.tryAcquire(from, now)) {
             if (overLimitLog.tryAcquire(from, now)) FileLog.w("telegram: user $from over 10 messages a minute, ignoring")
             return
         }
@@ -359,13 +406,18 @@ class Bot(private val control: Control, private val usersFile: File) {
             else reply("Unknown command. Send /help")
             return
         }
+        if (route == Route.UNKNOWN) {
+            FileLog.i("telegram: unknown command '$name'$who")
+            reply("Unknown command. Send /help")
+            return
+        }
         // (docs/INCIDENTS.md S9) Sent while the phone was offline? Settings still apply; "do it now" commands don't.
         if (LateCommands.action(name, age, MAX_COMMAND_AGE_S.toLong()) == LateAction.SKIP) {
             FileLog.i("telegram: skipped old command '$text'$who (${age}s old)")
             reply("⏭ Skipped $name: sent ${age / 60} min ago while I was offline.")
             return
         }
-        if (Routing.route(role, chatType, name) == Route.NOT_ALLOWED) {
+        if (route == Route.NOT_ALLOWED) {
             FileLog.i("telegram: refused '$name'$who (owner only)")
             reply("Only the owner can do that.")
             return
@@ -379,9 +431,10 @@ class Bot(private val control: Control, private val usersFile: File) {
             "/clip" -> {
                 val n = arg?.toIntOrNull() ?: 10
                 if (n !in 1..30) reply("Usage: /clip N   (N = 1 to 30 seconds)")
-                else { reply("Recording $n s…"); control.clip(n, chatId) }
+                else if (control.clip(n, chatId)) reply("Recording $n s…")
+                else reply("Busy with another clip. Try again in a moment.")
             }
-            "/status" -> control.status(chatId)
+            "/status" -> control.status(chatId, full = role == Role.OWNER)
             "/record" -> onOff(arg)?.let { control.setRecording(it); reply("Recording on motion: ${if (it) "ON" else "OFF"}") }
                 ?: reply("Usage: /record on   or   /record off")
             "/alerts" -> onOff(arg)?.let { control.setAlerts(it); reply("Motion alerts: ${if (it) "ON" else "OFF"}") }

@@ -36,10 +36,12 @@ done
 echo "Your Telegram user ID: $USER_ID"
 
 # Write config on the phone via stdin, then open the app so it imports it right away
-# (the app moves it to private storage and deletes the /sdcard copy).
+# (the app moves it to private storage and deletes the /sdcard copy). This works only for FIRST setup
+# (no token in the app yet): afterwards only /reload from Telegram imports (docs/SECURITY.md). If the
+# token is dead, clear the app's data (or reinstall) first, then run this script again.
 printf '{"telegramBotToken": "%s", "telegramUserId": %s}\n' "$TOKEN" "$USER_ID" \
   | ssh phone 'cat > /sdcard/cctv/config.json && am start -n com.nandan.cctv/.MainActivity >/dev/null'
 TOKEN=""
 sleep 5
-ssh phone 'ls /sdcard/cctv/config.json 2>/dev/null && echo "WARNING: config.json still on /sdcard" || echo "Config imported into the app."; grep "telegram" /sdcard/cctv/log.txt | tail -2'
+ssh phone 'if grep "config.json" /sdcard/cctv/log.txt | tail -1 | grep -q "ignored"; then echo "NOT imported: the app already has a token. Clear its data (or reinstall), then run this again."; elif [ -e /sdcard/cctv/config.json ]; then echo "WARNING: config.json still on /sdcard"; else echo "Config imported into the app."; fi; grep "telegram" /sdcard/cctv/log.txt | tail -2'
 echo "You should get a message from @$BOT within a minute."

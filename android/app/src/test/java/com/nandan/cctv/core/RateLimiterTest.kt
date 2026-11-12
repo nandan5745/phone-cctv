@@ -29,4 +29,13 @@ class RateLimiterTest {
         assertFalse(r.tryAcquire(1, 1))
         assertTrue(r.tryAcquire(2, 1))
     }
+
+    @Test
+    fun expiredKeysAreForgotten() {
+        // Strangers' ids must not pile up forever.
+        val r = RateLimiter(1, 1_000)
+        for (k in 1L..500L) r.tryAcquire(k, 0)
+        r.tryAcquire(9_999, 5_000)
+        assertTrue(r.keyCount <= 257)
+    }
 }

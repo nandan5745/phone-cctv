@@ -26,7 +26,7 @@ Every feature and command so far (Phases 1–5). **Tested on phone?** yes = seen
 | Feature | How it works (1 line) | Tested on phone? | Evidence | Notes |
 |---|---|---|---|---|
 | Long polling | `getUpdates` every 50 s over HTTPS; no open port | yes | Every `telegram: command …` line | |
-| Owner-only answers | Only `telegramUserId` gets replies | partly | Owner's commands answered | Never tried from another account (Phase 6) |
+| Roles: owner + members, private chats only | `/allow ID`, `/revoke ID`, `/users`; members get alerts + `/snapshot` `/clip` `/last` `/status`; others "Only the owner can do that."; strangers ignored, owner notified once a day; groups ignored; 10 msgs/min per user | no | — | Task 8 (0.4.x); phone check with a second account pending |
 | Alert photo on motion | Photo sent on motion, 120 s cooldown, if `/alerts on` | yes | Owner received alert photos (Telegram, 2026-11-06) | Successful sends aren't logged, only retries |
 | Alert video | The clip is sent too, if `/videos on` | yes | 2026-11-11 18:27:22 `[tg-media] telegram: sent video on try 2` | |
 | `/start`, `/help` | Command list | yes | 2026-11-06 23:35:02 `telegram: command '/help'` | |

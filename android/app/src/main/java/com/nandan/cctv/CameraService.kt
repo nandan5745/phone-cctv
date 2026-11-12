@@ -122,9 +122,10 @@ class CameraService : Service(), Bot.Control {
 
     // Telegram requests and alerts (camera thread).
     private var rotation = 0              // degrees to turn camera images upright
-    private var snapshotWanted = false
+    private val snapshotFor = mutableSetOf<Long>() // chats waiting for a /snapshot
     private var clipWantedSeconds = 0     // > 0: a /clip is waiting to start
-    private var sendClipWhenDone = false
+    private var clipFor = 0L              // chat that asked for it
+    private var sendClipTo = emptyList<Long>() // who gets the clip being recorded (none, the /clip asker, or everyone)
     private var lastAlertAt = -1L
 
     // Battery watcher state (camera thread).
@@ -223,7 +224,7 @@ class CameraService : Service(), Bot.Control {
             acquire()
         }
 
-        bot = Bot(this)
+        bot = Bot(this, File(filesDir, "users.json"))
         bot.configure(config)
         scheduleWatchdogAlarm()
         startSshdOncePerBoot()
@@ -387,21 +388,21 @@ class CameraService : Service(), Bot.Control {
             saveJpeg(data, File(FileLog.dir, "test.jpg"))
         }
 
-        if (snapshotWanted) {
-            snapshotWanted = false
+        if (snapshotFor.isNotEmpty()) {
             val label = labelTime.format(Date())
-            encodeJpeg(data)?.let { bot.sendPhoto(it, rotation, label, "📷 $label") }
+            encodeJpeg(data)?.let { jpeg -> for (chat in snapshotFor) bot.sendPhoto(chat, jpeg, rotation, label, "📷 $label") }
+            snapshotFor.clear()
         }
 
         if (clipWantedSeconds > 0) {
             val secs = clipWantedSeconds
             clipWantedSeconds = 0
             if (Storage.freeMB() < config.minFreeMB) {
-                bot.send("Not enough free storage to record (${Storage.freeMB()} MB free).")
+                bot.sendTo(clipFor, "Not enough free storage to record (${Storage.freeMB()} MB free).")
             } else {
-                startRecording(File(Storage.clipsDir, fileTime.format(Date()) + ".mp4"), secs, sendWhenDone = true)
+                startRecording(File(Storage.clipsDir, fileTime.format(Date()) + ".mp4"), secs, sendTo = listOf(clipFor))
                 if (recorder != null) return@PreviewCallback // camera now belongs to MediaRecorder
-                bot.send("Recording failed, see /log")
+                bot.sendTo(clipFor, "Recording failed, see /log")
                 return@PreviewCallback // buffers were re-attached by resumeAfterRecording
             }
         }
@@ -454,7 +455,7 @@ class CameraService : Service(), Bot.Control {
             lastAlertAt = now
             daily.alerts++
             val label = labelTime.format(Date())
-            bot.sendPhoto(jpeg, rotation, label, "🚨 Motion at $label (${"%.0f".format(share * 100)}% of view changed)")
+            bot.broadcastPhoto(jpeg, rotation, label, "🚨 Motion at $label (${"%.0f".format(share * 100)}% of view changed)")
         }
 
         if (photoOnly || !recordOn) {
@@ -464,11 +465,11 @@ class CameraService : Service(), Bot.Control {
             // Send the video too (after the photo), with the same cooldown as alerts.
             val sendVideo = videosOn && (lastVideoAt < 0 || now - lastVideoAt >= cooldownMs)
             if (sendVideo) lastVideoAt = now
-            startRecording(File(Storage.clipsDir, "$name.mp4"), config.clipSeconds, sendWhenDone = sendVideo)
+            startRecording(File(Storage.clipsDir, "$name.mp4"), config.clipSeconds, sendTo = if (sendVideo) bot.recipients() else emptyList())
         }
     }
 
-    private fun startRecording(file: File, seconds: Int, sendWhenDone: Boolean) {
+    private fun startRecording(file: File, seconds: Int, sendTo: List<Long>) {
         val c = camera ?: return
         val r = MediaRecorder()
         try {
@@ -497,7 +498,7 @@ class CameraService : Service(), Bot.Control {
             recorder = r
             recordingFile = file
             recordStartedAt = SystemClock.elapsedRealtime()
-            sendClipWhenDone = sendWhenDone
+            sendClipTo = sendTo
             // Backup in case the max-duration event never comes.
             cam.postDelayed(recordTimeout, seconds * 1000L + 5_000L)
         } catch (e: Exception) {
@@ -536,14 +537,14 @@ class CameraService : Service(), Bot.Control {
                 statClips++
                 daily.clips++
                 FileLog.i("clip saved ${f.name} ${f.length() / 1024} KB ${secs}s")
-                if (sendClipWhenDone) bot.sendVideo(f, "🎥 ${f.nameWithoutExtension} (${secs}s)")
+                for (chat in sendClipTo) bot.sendVideo(chat, f, "🎥 ${f.nameWithoutExtension} (${secs}s)")
             } else {
                 f.delete()
                 noteRecordFailure()
-                if (sendClipWhenDone) bot.send("Recording failed, see /log")
+                for (chat in sendClipTo) bot.sendTo(chat, "Recording failed, see /log")
             }
         }
-        sendClipWhenDone = false
+        sendClipTo = emptyList()
         resumeAfterRecording()
         Storage.enforceCap(config.storageCapMB)
     }
@@ -809,9 +810,9 @@ class CameraService : Service(), Bot.Control {
     // ---------------------------------------------------------------- Telegram commands (Bot.Control)
     // Called on the "tg-poll" thread; the work is posted to the camera thread.
 
-    override fun snapshot() { cam.post { snapshotWanted = true } } // taken from the next frame
-    override fun clip(seconds: Int) { cam.post { clipWantedSeconds = seconds.coerceIn(1, MAX_CLIP_S) } }
-    override fun status() { cam.post { bot.send(statusText()) } }
+    override fun snapshot(chatId: Long) { cam.post { snapshotFor += chatId } } // taken from the next frame
+    override fun clip(seconds: Int, chatId: Long) { cam.post { clipWantedSeconds = seconds.coerceIn(1, MAX_CLIP_S); clipFor = chatId } }
+    override fun status(chatId: Long) { cam.post { bot.sendTo(chatId, statusText()) } }
     override fun setRecording(on: Boolean) { recordOn = on; prefs().edit().putBoolean("record", on).apply() }
     override fun setAlerts(on: Boolean) { alertsOn = on; prefs().edit().putBoolean("alerts", on).apply() }
     override fun sshd() {
@@ -821,13 +822,13 @@ class CameraService : Service(), Bot.Control {
 
     override fun setVideos(on: Boolean) { videosOn = on; prefs().edit().putBoolean("videos", on).apply() }
 
-    override fun last() {
+    override fun last(chatId: Long) {
         cam.post {
             val clip = Storage.clipsDir.listFiles()
                 ?.filter { it.isFile && it.name.endsWith(".mp4") && it != recordingFile }
                 ?.maxByOrNull { it.name }
-            if (clip == null) bot.send("No saved clips yet.")
-            else bot.sendVideo(clip, "🎞 Last clip: ${clip.nameWithoutExtension} (${clip.length() / 1024} KB)")
+            if (clip == null) bot.sendTo(chatId, "No saved clips yet.")
+            else bot.sendVideo(chatId, clip, "🎞 Last clip: ${clip.nameWithoutExtension} (${clip.length() / 1024} KB)")
         }
     }
 

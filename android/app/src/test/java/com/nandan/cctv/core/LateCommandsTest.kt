@@ -20,7 +20,7 @@ class LateCommandsTest {
 
     @Test
     fun lateReadOnlyRun() {
-        for (c in listOf("/status", "/summary", "/last", "/log")) assertEquals(c, LateAction.RUN, LateCommands.action(c, 4808))
+        for (c in listOf("/status", "/summary", "/last", "/log", "/users", "/allow", "/revoke")) assertEquals(c, LateAction.RUN, LateCommands.action(c, 4808))
     }
 
     @Test

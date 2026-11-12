@@ -196,8 +196,8 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 - `Bot.send(chatId: Long, text: String)`; `Bot.broadcast…` variants send alerts/videos/warnings to every user in `auth.users()`.
 - Users persisted at `filesDir/users.json` (written on allow/revoke).
 
-- [ ] **Step 1:** Route: `roleOf` null → if `RateLimiter(1, 24h)` allows that user → owner gets `"👤 Unknown user <first_name> (id N) wrote to the bot. /allow N to add them."`; no reply to the stranger. Role present → `Commands.allowed` false → reply `"Only the owner can do that."`. Per-user `RateLimiter(10, 60 s)` → over limit: ignore + log once. Replies and command results go to the requester's chat. `/allow N`, `/revoke N`, `/users` implemented; added member gets `"✅ You can now use this camera. Send /help."`
-- [ ] **Step 2:** `scripts/jvmtest.sh` still green; push; CI green
+- [x] **Step 1:** Route: `roleOf` null → if `RateLimiter(1, 24h)` allows that user → owner gets `"👤 Unknown user <first_name> (id N) wrote to the bot. /allow N to add them."`; no reply to the stranger. Role present → `Commands.allowed` false → reply `"Only the owner can do that."`. Per-user `RateLimiter(10, 60 s)` → over limit: ignore + log once. Replies and command results go to the requester's chat. `/allow N`, `/revoke N`, `/users` implemented; added member gets `"✅ You can now use this camera. Send /help."`
+- [x] **Step 2:** `scripts/jvmtest.sh` still green; push; CI green (78 tests; added `core/Routing` + `RoutingTest`, RateLimiter pruning, `/allow` `/revoke` `/users` run when late)
 - [ ] **Step 3: Phone check** (second Telegram account): first message → owner notice with its id, stranger gets nothing; `/allow <id>` → member gets the welcome; member `/snapshot` works, member `/record off` → "Only the owner can do that."; walk past → **both** accounts get the alert; member adds bot to a group and sends `/status` there → no reply (log `ignored … chat type group`); `/revoke <id>` → member ignored again
 - [ ] **Step 4: Commit** `feat: roommates with roles and approval flow`
 

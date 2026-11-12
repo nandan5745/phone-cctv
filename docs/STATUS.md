@@ -17,7 +17,7 @@
 | 5 Storage dashboard + daily summary | ✅ done 2026-11-12 (unprompted summary 09:00:15) |
 | 6 Housekeeping (drop `QUICKBOOT_POWERON`, uninstall Termux:Boot) + Phase 5 review | ✅ done 2026-11-11 (review fixes 1–6; PIN reboot passed) |
 | 7 Auth, Commands, RateLimiter (pure) | ✅ done 2026-11-11 |
-| 8 Role-based routing in the bot | ⏭ next |
+| 8 Role-based routing in the bot | 🔄 code pushed, phone check pending (second account) |
 | 9–22 | ⏳ |
 
 Phases 1–4: done (see `docs/ROADMAP.md`). Per-feature test status: `docs/FEATURES.md`.

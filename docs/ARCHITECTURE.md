@@ -57,7 +57,8 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `LateCommands.kt` | Which late commands still run (settings, read-only) and which are skipped; what counts as a command. | `LateCommandsTest` (6) |
 | `Auth.kt` | Owner + approved members, private chats only; JSON; corrupt JSON → owner only (wired in Task 8). | `AuthTest` (7) |
 | `Commands.kt` | Parse `/name@bot arg rest`; members may use only `/start /help /snapshot /clip /last /status`. | `CommandsTest` (5) |
-| `RateLimiter.kt` | At most N events per sliding window per user id. | `RateLimiterTest` (3) |
+| `RateLimiter.kt` | At most N events per sliding window per user id; forgets expired ids beyond 256. | `RateLimiterTest` (4) |
+| `Routing.kt` | Message → ignore (not a private chat) / stranger notice / "owner only" / run; the stranger notice text. | `RoutingTest` (5) |
 | `SendPolicy.kt` | After a failed send: retry (network, 429, 5xx) or drop (other 4xx, missing file). | `SendPolicyTest` (5) |
 | `TestTemp.kt` | `/testtemp` argument parsing within each monitor's valid range. | `TestTempTest` (4) |
 | `StorageMath.kt` | MB/day from the last 3 complete days; days until the size cap starts deleting, or at the cap the days of history it holds (`storageOutlook`). | `StorageMathTest` (6) |
@@ -108,7 +109,7 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `clips/YYYY-MM-DD_HH-MM-SS.mp4` | The clip (~2.3 MB per 20 s). |
 | `config.json` | Only briefly: dropped there, then moved to app-private storage. |
 
-App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the token), shared prefs `state` (record/alerts/videos switches, `sshdBootMin`, `daily` = DailyStats JSON, `dailySentDay`).
+App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the token), `files/users.json` (members added with `/allow`; written via a temp file), shared prefs `state` (record/alerts/videos switches, `sshdBootMin`, `daily` = DailyStats JSON, `dailySentDay`).
 
 ## 6. Config keys (`config.json`, all optional)
 
@@ -134,9 +135,9 @@ Change settings: write `/sdcard/cctv/config.json` over SSH, then open the app (`
 
 ## 7. Telegram commands
 
-Today only `telegramUserId` (the owner) gets any answer. Phase 6 adds members.
+The owner (`telegramUserId`) and members added with `/allow` get answers, in private chats only. Strangers get no reply; the owner gets "👤 Unknown user … /allow N" once a day per stranger. 10 messages a minute per user. Motion alert photos and videos go to everyone; warnings, back-online, outage and daily summaries go to the owner only.
 
-| Command | What it does | After Phase 6 | Runs if it arrives > 2 min late? |
+| Command | What it does | Who | Runs if it arrives > 2 min late? |
 |---|---|---|---|
 | `/start`, `/help` | Command list | everyone | yes |
 | `/snapshot` | Photo now | member | no (skipped, you're told) |
@@ -149,6 +150,9 @@ Today only `telegramUserId` (the owner) gets any answer. Phase 6 adds members.
 | `/log` | Last 30 log lines | owner | yes |
 | `/reload` | Re-read settings | owner | yes |
 | `/summary` | Counts since the last daily summary + storage line (no reset) | owner | yes |
+| `/allow ID` | Add a member (they get "✅ You can now use this camera") | owner | yes |
+| `/revoke ID` | Remove a member | owner | yes |
+| `/users` | List owner and members | owner | yes |
 | `/sshd` | Ask Termux to start sshd | owner | no |
 | `/testkill` | Crash the app on purpose | owner | no |
 | `/teststop` | Stop the service (alarm restarts it) | owner | no |
@@ -172,6 +176,7 @@ Today only `telegramUserId` (the owner) gets any answer. Phase 6 adds members.
 | `telegram: command '…'` / `running late command` / `skipped old command` | Commands received. |
 | `telegram: sending X failed (try N, S s)` / `sent X on try N` / `dropped X: …` | Send retries; a send that can't succeed is dropped. |
 | `telegram: ignored old non-command message` | Plain chat text that arrived late (no reply). |
+| `telegram: ignored message from N: chat type group` / `message from unknown user (id N)` / `refused '/x' from member N (owner only)` / `allowed member N` / `revoked member N` / `over 10 messages a minute` | Roles (Task 8). |
 | `telegram: poll failed (N)` / `reachable again after N` / `outage HH:mm-HH:mm, N motions[, cause: …]` | Connection loss and recovery. |
 | `net: outage cause: … (wifi …, check page …)` / `net: check page failed: <error>` | After 2 min offline, one check of Wi-Fi + `http://connectivitycheck.gstatic.com/generate_204` (204 = internet fine, other code = login page, no answer = no internet; the error tells DNS from timeout). |
 | `telegram: tg-text/tg-media queue full, dropped oldest` | Send queue overflow. |

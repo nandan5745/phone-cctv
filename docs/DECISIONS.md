@@ -83,6 +83,10 @@ Format: **decision** (date): why · rejected alternatives · cost if wrong.
 | 6 (review, owner) | Daily summary due when not yet sent *today* (`!=`), replacing `today > lastSent` | a clock jumping back sends one extra summary (Review Focus #4 traded: never "skipped forever") |
 | 6 (review) | Old non-command messages ignored without a reply; `/testtemp` battery 1–100, CPU 1–150; daily summary checked even without a battery reading | none |
 | 6 | Fixes 1–6 in one commit (each with its own tests), not one commit each: the fixes share Bot.kt/CameraService.kt hunks and interactive staging isn't available | coarser history |
+| 8 | Routing decision pulled into `core/Routing` (+5 tests) so it is unit-tested, not only phone-checked | none |
+| 8 | Members get motion alert photos and videos only; heat/battery warnings, back-online, outage and daily summaries stay owner-only (roadmap: "members get alerts"), though the plan said "alerts/videos/warnings" | a roommate isn't told the camera paused for heat |
+| 8 | `/allow`, `/revoke`, `/users` run when late (settings/read-only) | none |
+| 8 | RateLimiter forgets expired ids once it holds > 256 (stranger spam can't grow memory) (+1 test) | none |
 | 4 (pre-start, 11-11) | Outage cause enum gains `TELEGRAM_DOWN` (probe 204 = internet fine, Telegram not) | one more case to test |
 
 ## Rejected tools

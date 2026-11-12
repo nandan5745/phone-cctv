@@ -35,9 +35,17 @@ object Commands {
      */
     fun sshdMinutes(arg: String?, rest: String): Int? {
         if (arg == "off") return null
-        val n = rest.split(Regex("\\s+")).getOrNull(1)?.toIntOrNull() ?: return 30
+        // "/sshd on 10" or "/sshd 10"
+        val n = rest.split(Regex("\\s+")).take(2).firstNotNullOfOrNull { it.toIntOrNull() } ?: return 30
         return n.coerceIn(5, 120)
     }
+
+    /**
+     * SSH must close: the deadline ([untilMs], 0 = not on) has passed, or it is more than the
+     * 120-minute maximum away, which only happens if the clock moved back since /sshd on.
+     */
+    fun sshdExpired(nowMs: Long, untilMs: Long): Boolean =
+        untilMs > 0 && (nowMs >= untilMs || untilMs - nowMs > 120 * 60_000L)
 
     fun allowed(role: Role, name: String): Boolean = role == Role.OWNER || name in MEMBER
 }

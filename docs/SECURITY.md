@@ -36,7 +36,7 @@ Threat model for the phone CCTV, written in Task 9 (2026-11-12) and checked by `
 | Network | No listening port in the app; outgoing HTTPS to Telegram only (plus one plain-HTTP connectivity check during an outage) | `Bot`, `TelegramApi` |
 | `BootReceiver` (exported) | Only system-protected broadcasts (the unprotected `QUICKBOOT_POWERON` was removed in Task 6); a fake broadcast could at most start the CCTV | `AndroidManifest.xml` |
 | Termux `RUN_COMMAND` | The app runs one fixed script path; no user text reaches it | `Termux.kt` |
-| sshd | Key-only login. **Off by default** since Task 10: `/sshd on [min]` (owner only, 5–120 min, default 30) starts it, it stops by itself at the deadline (kept in prefs, survives restarts), `/sshd off` stops it now; not started at boot unless `sshdAtBoot` | `Termux.kt` (fixed script names only), `phone/termux/` |
+| sshd | Key-only login. **Off by default** since Task 10: `/sshd on [min]` (owner only, 5–120 min, default 30) starts it, it stops by itself at the deadline (kept in prefs, survives restarts), `/sshd off` stops it now; not started at boot unless `sshdAtBoot`; a `/sshd off` that arrives late still runs; a deadline more than 120 min away (clock moved back) counts as expired; `stop-sshd` kills the PID only if it is sshd and releases Termux's wake lock | `Termux.kt` (fixed script names only), `core/Commands.sshdExpired`, `phone/termux/` |
 | Clips on `/sdcard` | Screen PIN; no other apps installed | Phone settings |
 | Updates | Signed with the fixed key held only in GitHub secrets | CI |
 | Repo | Private values listed in a local patterns file; `scripts/privacy-check.sh` before every commit | `scripts/` |
@@ -64,9 +64,24 @@ Threat model for the phone CCTV, written in Task 9 (2026-11-12) and checked by `
 | Telegram is not end-to-end encrypted for bots | Telegram's servers can see photos; acceptable for this use |
 | Clips readable by any app with storage permission | Phone kept app-free; moving clips to private storage is cut for time |
 | No certificate pinning | Pinning would break the bot if Telegram changes certificate authority; cut for time |
+| The `/sshd on` reply can't confirm sshd really started ("Asked Termux to start SSH …") | The check would need the SSH port inside the app; a failed start shows as a failed `ssh` |
+| An sshd started at boot by a version before Task 10 had no deadline | One-time transition; gone after the 2026-11-12 reboot |
 | `allow-external-apps = true` in Termux | Any app with Termux's RUN_COMMAND permission could run code as Termux; the phone stays app-free |
 | sshd running while `/sshd on` is active (old frozen OpenSSH from the Android 5 Termux repo) | Key-only, owner opens it for minutes at a time |
 | A member's Telegram account is taken over | The attacker gets what a member gets (photos, `/status`); the owner revokes |
+
+## Phone checklist (Task 11)
+
+| Item | State |
+|---|---|
+| Screen PIN, secure start-up "No" | ✅ set 2026-11-12 (locked reboot recovers) |
+| Bluetooth off | ✅ owner 2026-11-11; `/status` shows `Radios: Bluetooth off` (2026-11-12) |
+| Location off | ✅ owner 2026-11-11 |
+| NFC | Not present |
+| Mobile data | No SIM in the phone |
+| Keep Wi-Fi on during sleep: Always | ✅ owner 2026-11-11 |
+| Unused preinstalled apps disabled | Recommended list given 2026-11-13 (store, cloud, update and tracking apps, media apps, live wallpapers); owner to disable, then a reboot check |
+| No other apps installed | ✅ only CCTV and Termux added (Termux:Boot removed 2026-11-11) |
 
 ## Review log
 
@@ -74,4 +89,5 @@ Threat model for the phone CCTV, written in Task 9 (2026-11-12) and checked by `
 |---|---|---|
 | 2026-11-11 | `/code-review` Phase 5 | 9 findings; 6 fixed (incl. one send blocking a lane forever), 2 cleanups deferred, 1 merged into a fix (docs/INCIDENTS.md S16–S17) |
 | 2026-11-12 | `/code-review high` Phase 6 (Tasks 7–8) | 9 findings, all fixed test-first: owner exempt from the rate limit; one queue item per alert with recipients read at send time (revoked users get nothing queued); one `/clip` at a time; members' `/status` without IP; one bad `users.json` entry no longer drops all members; ≤ 5 stranger notices an hour; unknown member commands say "Unknown command"; routing computed once |
+| 2026-11-13 | `/code-review high` Phase 7 (Tasks 10–11) + manual security pass | 7 findings: 5 fixed test-first (late `/sshd off` runs, clock-safe deadline, `/sshd 10`, wake lock released, PID checked before kill); 2 accepted (reply can't confirm sshd started; pre-Task-10 sshd had no deadline) |
 | 2026-11-12 | Security review: **a manual pass**, not the `/security-review` skill (the skill compares against `origin/HEAD`, which is missing here, and everything was already pushed, so its diff would be empty). Covered the Phase 6 diff and the whole attack surface above | 1 extra finding from Phase 1, fixed: any installed app could drop `/sdcard/cctv/config.json` (its own token + owner ID) and open the app to take over the bot → import only on first setup or `/reload` (INCIDENTS S19) |

@@ -36,6 +36,7 @@ import android.view.WindowManager
 import com.nandan.cctv.core.BatteryEvent
 import com.nandan.cctv.core.BatteryMonitor
 import com.nandan.cctv.core.ClipSlot
+import com.nandan.cctv.core.Commands
 import com.nandan.cctv.core.Routing
 import com.nandan.cctv.core.BatterySample
 import com.nandan.cctv.core.HeatMonitor
@@ -843,14 +844,15 @@ class CameraService : Service(), Bot.Control {
         val until = System.currentTimeMillis() + minutes * 60_000L
         prefs().edit().putLong("sshdUntil", until).apply()
         val ok = Termux.run(this, Termux.START_SSHD, "/sshd on $minutes")
-        bot.send(if (ok) "SSH on for $minutes min (until ${SimpleDateFormat("HH:mm", Locale.US).format(Date(until))}). Try ssh in ~10 s."
+        // "Asked": the app can't see whether sshd really started (that needs the private SSH port).
+        bot.send(if (ok) "Asked Termux to start SSH for $minutes min (until ${SimpleDateFormat("HH:mm", Locale.US).format(Date(until))}). Try ssh in ~10 s."
             else "Could not reach Termux, see /log")
     }
 
     /** Every minute (battery watcher): past the /sshd on deadline → stop sshd. Kept in prefs, so it survives restarts. */
     private fun sshdAutoOff() {
         val until = prefs().getLong("sshdUntil", 0)
-        if (until > 0 && System.currentTimeMillis() >= until) {
+        if (Commands.sshdExpired(System.currentTimeMillis(), until)) {
             prefs().edit().remove("sshdUntil").apply()
             Termux.run(this, Termux.STOP_SSHD, "auto-off")
         }

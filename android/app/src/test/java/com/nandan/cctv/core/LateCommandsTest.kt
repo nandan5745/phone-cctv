@@ -39,4 +39,12 @@ class LateCommandsTest {
         assertTrue(LateCommands.isCommand("/status"))
         for (t in listOf("", "/", "hi", "status")) assertFalse(t, LateCommands.isCommand(t))
     }
+
+    @Test
+    fun lateSshdOffRunsLateSshdOnSkipped() {
+        // Turning SSH off is the safe direction: it must run even if it arrives late.
+        assertEquals(LateAction.RUN, LateCommands.action("/sshd", 4808, arg = "off"))
+        assertEquals(LateAction.SKIP, LateCommands.action("/sshd", 4808, arg = "on"))
+        assertEquals(LateAction.SKIP, LateCommands.action("/sshd", 4808))
+    }
 }

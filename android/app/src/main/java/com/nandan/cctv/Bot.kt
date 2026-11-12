@@ -413,7 +413,7 @@ class Bot(private val control: Control, private val usersFile: File) {
             return
         }
         // (docs/INCIDENTS.md S9) Sent while the phone was offline? Settings still apply; "do it now" commands don't.
-        if (LateCommands.action(name, age, MAX_COMMAND_AGE_S.toLong()) == LateAction.SKIP) {
+        if (LateCommands.action(name, age, MAX_COMMAND_AGE_S.toLong(), cmd.arg) == LateAction.SKIP) {
             FileLog.i("telegram: skipped old command '$text'$who (${age}s old)")
             reply("⏭ Skipped $name: sent ${age / 60} min ago while I was offline.")
             return

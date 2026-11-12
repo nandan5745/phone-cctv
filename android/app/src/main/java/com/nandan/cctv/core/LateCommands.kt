@@ -16,6 +16,7 @@ object LateCommands {
     /** "/status" is a command; "", "/" and plain words are not. */
     fun isCommand(name: String) = name.length > 1 && name.startsWith("/")
 
-    fun action(name: String, ageS: Long, maxAgeS: Long = 120): LateAction =
-        if (ageS <= maxAgeS || name in RUN_WHEN_LATE) LateAction.RUN else LateAction.SKIP
+    /** [arg] = first word after the command: "/sshd off" always runs (closing SSH is the safe direction). */
+    fun action(name: String, ageS: Long, maxAgeS: Long = 120, arg: String? = null): LateAction =
+        if (ageS <= maxAgeS || name in RUN_WHEN_LATE || (name == "/sshd" && arg == "off")) LateAction.RUN else LateAction.SKIP
 }

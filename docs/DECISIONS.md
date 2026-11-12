@@ -91,6 +91,8 @@ Format: **decision** (date): why · rejected alternatives · cost if wrong.
 | 9 (review, owner) | `/sdcard` config imported only on first setup or `/reload` from Telegram; else deleted + owner warned | a dead token needs clear data / reinstall + set-telegram.sh |
 | 9 (review, owner) | Owner not rate-limited; members 10/min; stranger notices ≤ 5/hour; members' `/status` hides the Wi-Fi line; one `/clip` at a time ("Busy") | — |
 | 9 | `/security-review` skill not usable on pushed `main` (no `origin/HEAD`, empty diff): manual security pass instead, noted in SECURITY.md | the skill's own checklist not applied |
+| 11 (review, owner) | `/sshd off` runs even when late; deadline > 120 min away = expired; `/sshd 10` = 10 min; `stop-sshd` checks the PID is sshd and releases the wake lock | — |
+| 11 (review, owner) | No "SSH on ✅" check (the app config has no SSH port; adding it means rewriting the whole config with the token): reply says "Asked Termux to start SSH …" | a failed start is noticed only when ssh fails |
 | 4 (pre-start, 11-11) | Outage cause enum gains `TELEGRAM_DOWN` (probe 204 = internet fine, Telegram not) | one more case to test |
 
 ## Rejected tools

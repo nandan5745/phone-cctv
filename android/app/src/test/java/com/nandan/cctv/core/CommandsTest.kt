@@ -61,4 +61,20 @@ class CommandsTest {
         assertEquals(30, Commands.sshdMinutes("on", "on soon"))
         assertEquals(30, Commands.sshdMinutes("maybe", "maybe"))
     }
+
+    @Test
+    fun sshdNumberWithoutOn() {
+        assertEquals(10, Commands.sshdMinutes("10", "10"))
+        assertEquals(120, Commands.sshdMinutes("999", "999"))
+    }
+
+    @Test
+    fun sshdDeadlineExpiry() {
+        val min = 60_000L
+        assertFalse(Commands.sshdExpired(nowMs = 0, untilMs = 0))              // not on
+        assertFalse(Commands.sshdExpired(nowMs = 0, untilMs = 30 * min))       // on, 30 min left
+        assertTrue(Commands.sshdExpired(nowMs = 30 * min, untilMs = 30 * min)) // deadline reached
+        // Clock moved back: a deadline more than 120 min away can't be real.
+        assertTrue(Commands.sshdExpired(nowMs = 0, untilMs = 121 * min))
+    }
 }

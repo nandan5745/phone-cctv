@@ -2,7 +2,7 @@
 
 Copied from the approved planning document, without private details. Step-by-step tasks: `docs/plans/phases-5-10.md`. Current position: `docs/STATUS.md`.
 
-## Phase status (2026-11-11)
+## Phase status (2026-11-12)
 
 | Phase | What | Status |
 |---|---|---|
@@ -10,7 +10,7 @@ Copied from the approved planning document, without private details. Step-by-ste
 | 2 | Motion detection, clips, storage cap | ✅ done 2026-11-06 |
 | 3 | Telegram bot, alerts, commands | ✅ done 2026-11-06 |
 | 4 | Reliability: boot/update start, alarm watchdog, sshd at boot | ✅ done 2026-11-07 (7-day soak still to come) |
-| 5 | Safety and operations | 🔄 Tasks 1–4 and 6 done (Task 3 partly untested, Task 4 outage cause untested until a real outage); Task 5 waits for its 09:00 summary |
+| 5 | Safety and operations | ✅ done 2026-11-12 (Task 3 partly untested; Task 4 outage cause untested until a real outage) |
 | 6 | Roommates and roles | 🔄 Task 7 started 2026-11-11 |
 | 7 | Security hardening, SSH on demand, SECURITY.md | ⏳ not started |
 | 8 | Better motion detection (zones, background model, darkness, IR test) | ⏳ not started |

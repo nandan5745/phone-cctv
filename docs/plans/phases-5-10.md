@@ -141,7 +141,7 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 - [x] **Step 5: Phone check (2026-11-11, 0.4.21):** IP part done: owner confirmed the back-online message and `/status` show `Wi-Fi: <network>, IP …` (log `22:57:32 process started, version 0.4.21`, `started: app updated`). Outage-cause part **untested until a real outage**. Planned check: `/status` Wi-Fi line changes from `Wi-Fi: -77 dBm (3/4)` to `Wi-Fi: <ssid>, IP <addr>, -77 dBm (3/4)`; "back online" shows the IP; next real outage (or a Wi-Fi toggle on the phone, if the owner can) → summary names the cause, e.g. `(cause: no internet)`
 - [x] **Step 6: Commit** `feat: network diagnostics, IP in status` (`70503af`) + docs close commit
 
-### Task 5: Storage dashboard + daily summary
+### Task 5: Storage dashboard + daily summary ✅ (done 2026-11-12)
 
 **Files:** Create `core/StorageMath.kt`, `core/DailyStats.kt` + tests; Modify `Storage.kt`, `CameraService.kt`, `Bot.kt` (`/summary`), `Config.kt` (`dailySummaryHour`, default 9)
 
@@ -152,8 +152,8 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 - [x] **Step 1: Tests:** `retentionFromRate` (600 used, cap 1200, 100/day → `6.0` = cap ÷ rate); `noRateNoEstimate`; `mbPerDayUsesLastThreeCompleteDays`; `summaryDueOncePerDay` (due at 09:00 when last sent yesterday; not due again same day; not due at 08:59; a clock jump back to yesterday with `lastSentDay` = today → not due); `summaryTextHasAllCounters`
 - [x] **Step 2: Run** → FAIL. **Step 3: Implement**; `CameraService` increments counters, checks `summaryDue` every minute in the battery watcher, sends, resets, stores `lastSentDay`. `/summary` sends it immediately without resetting. **Step 4: Run** → pass (41 tests; rulings: `retentionDays` = days until the cap, `mbPerDay(…, today)`, `summaryDue` in the companion, `/summary` runs when late, max temp = real CPU reading — docs/DECISIONS.md)
-- [ ] **Step 5: Phone check:** (2026-11-11, 0.4.23: `/status` storage line and `/summary` confirmed by the owner; **follow-up (owner):** at the cap show `at cap: keeps about N days of history` instead of a stuck "0 days", `storageOutlook` + 3 tests; still open: the unprompted 09:00 summary on 2026-11-12) `/status` shows `Storage: 590 files (148 clips, 442 photos), 135/1200 MB, oldest 2026-11-06, ~N days left`; `/summary` returns the report; next day at 09:00 the summary arrives unprompted (evidence: Telegram message time)
-- [ ] **Step 6: Commit** `feat: storage dashboard and daily summary`
+- [x] **Step 5: Phone check:** (unprompted summary: `2026-11-12 09:00:15.482 I [camera] daily summary sent`; 2026-11-11, 0.4.23: `/status` storage line and `/summary` confirmed by the owner; **follow-up (owner):** at the cap show `at cap: keeps about N days of history` instead of a stuck "0 days", `storageOutlook` + 3 tests; done) `/status` shows `Storage: 590 files (148 clips, 442 photos), 135/1200 MB, oldest 2026-11-06, ~N days left`; `/summary` returns the report; next day at 09:00 the summary arrives unprompted (evidence: Telegram message time)
+- [x] **Step 6: Commit** `feat: storage dashboard and daily summary` (`0b2986e`, follow-up `8c6fe23`)
 
 ### Task 6: Housekeeping + Phase 5 review ✅ (done 2026-11-11)
 

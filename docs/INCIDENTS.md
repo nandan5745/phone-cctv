@@ -7,7 +7,7 @@ Each entry: symptom, evidence, root cause, fix, commit, status. Newest open ones
 ### O1. Hours-long internet outages (cause unknown)
 - **Symptom:** no replies or alerts for hours.
 - **Evidence (log):** `poll failed (1)` … `reachable again after N failed tries`: Nov 7 17:11–18:27; Nov 8 20:18–22:59 and 23:48–03:29; **Nov 11 14:09–17:51 (3 h 42 min, 3 motions)**. Errors are `UnknownHostException` (DNS) and `SSLException … Connection timed out`.
-- **Not the same as:** Nov 9 18:22–18:25 and Nov 11 06:44–06:47 were `HTTP 502 Bad Gateway` from Telegram's own servers.
+- **Not the same as:** Nov 9 18:22–18:25, Nov 11 06:44–06:47 and Nov 12 06:41–06:44 were `HTTP 502 Bad Gateway` from Telegram's own servers (two mornings in a row around 06:40–06:47 IST).
 - **Root cause:** unknown: home internet/router or the phone's Wi-Fi.
 - **Next:** since 0.4.21 (Task 4) the next outage longer than 2 min logs `net: outage cause: …` (Wi-Fi state + `generate_204` check) and `net: check page failed: <error>` (DNS vs timeout); read those lines after the next outage.
 

@@ -11,7 +11,7 @@ Copied from the approved planning document, without private details. Step-by-ste
 | 3 | Telegram bot, alerts, commands | ✅ done 2026-11-06 |
 | 4 | Reliability: boot/update start, alarm watchdog, sshd at boot | ✅ done 2026-11-07 (7-day soak still to come) |
 | 5 | Safety and operations | ✅ done 2026-11-12 (Task 3 partly untested; Task 4 outage cause untested until a real outage) |
-| 6 | Roommates and roles | 🔄 Task 7 started 2026-11-11 |
+| 6 | Roommates and roles | 🔄 Tasks 7–8 done (roommate test passed 2026-11-12); Task 9 review next |
 | 7 | Security hardening, SSH on demand, SECURITY.md | ⏳ not started |
 | 8 | Better motion detection (zones, background model, darkness, IR test) | ⏳ not started |
 | 9 | Native phone features (`/speak`, tamper alert) | ⏳ not started |

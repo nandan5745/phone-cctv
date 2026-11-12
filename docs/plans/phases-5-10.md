@@ -186,7 +186,7 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 - [x] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** → pass (72 tests; extras: `/summary` checked owner-only, `"/"` and `"  /status  "` parse cases, more corrupt-JSON shapes)
 - [x] **Step 5: Commit** `feat: core auth, command parsing, rate limiter`
 
-### Task 8: Role-based routing in the bot
+### Task 8: Role-based routing in the bot ✅ (done 2026-11-12)
 
 **Files:** Modify `Bot.kt`, `CameraService.kt` (Control methods take `chatId`), `TelegramApi.kt` (no change expected)
 
@@ -198,8 +198,8 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 - [x] **Step 1:** Route: `roleOf` null → if `RateLimiter(1, 24h)` allows that user → owner gets `"👤 Unknown user <first_name> (id N) wrote to the bot. /allow N to add them."`; no reply to the stranger. Role present → `Commands.allowed` false → reply `"Only the owner can do that."`. Per-user `RateLimiter(10, 60 s)` → over limit: ignore + log once. Replies and command results go to the requester's chat. `/allow N`, `/revoke N`, `/users` implemented; added member gets `"✅ You can now use this camera. Send /help."`
 - [x] **Step 2:** `scripts/jvmtest.sh` still green; push; CI green (78 tests; added `core/Routing` + `RoutingTest`, RateLimiter pruning, `/allow` `/revoke` `/users` run when late)
-- [ ] **Step 3: Phone check** (second Telegram account): first message → owner notice with its id, stranger gets nothing; `/allow <id>` → member gets the welcome; member `/snapshot` works, member `/record off` → "Only the owner can do that."; walk past → **both** accounts get the alert; member adds bot to a group and sends `/status` there → no reply (log `ignored … chat type group`); `/revoke <id>` → member ignored again
-- [ ] **Step 4: Commit** `feat: roommates with roles and approval flow`
+- [x] **Step 3: Phone check** (second Telegram account; done 2026-11-12 with the owner's roommate, IDs kept out of the repo, evidence in docs/FEATURES.md): first message → owner notice with its id, stranger gets nothing; `/allow <id>` → member gets the welcome; member `/snapshot` works, member `/record off` → "Only the owner can do that."; walk past → **both** accounts get the alert; member adds bot to a group and sends `/status` there → no reply (log `ignored … chat type group`); `/revoke <id>` → member ignored again
+- [x] **Step 4: Commit** `feat: roommates with roles and approval flow` (`bdf901a`)
 
 ### Task 9: Phase 6 review + SECURITY.md draft
 

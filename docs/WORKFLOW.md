@@ -5,7 +5,7 @@
 | Thing | What it is | If missing |
 |---|---|---|
 | SSH alias `phone` in `~/.ssh/config` | `Host phone` with `HostName <phone's address>`, `Port <Termux sshd port>`, `User <Termux user>`, `HostKeyAlias phone-cctv` | Get the values from the owner (Termux: `whoami`, `ifconfig`); the host-key alias keeps the saved key valid when DHCP changes the address |
-| `~/.config/phone-cctv/private-patterns.txt` | One regex per line of private values (address prefix, Termux user, SSH port, bot username, email, key folder, phone MAC) for `scripts/privacy-check.sh` | Recreate from the same list; `chmod 600` |
+| `~/.config/phone-cctv/private-patterns.txt` | One regex per line of private values (address prefix, Termux user, SSH port, bot username, email, key folder, phone MAC, Telegram user IDs of owner and roommates) for `scripts/privacy-check.sh` | Recreate from the same list; `chmod 600` |
 | Ledger `.superpowers/sdd/phases-5-10/progress.md` | Execution log: task completions, BASE commits, rulings (git-ignored) | Rulings are also in docs/DECISIONS.md; BASE = the commit before a task's first commit (`git log`) |
 | Local memory | Claude Code auto-memory for this project (`~/.claude/projects/<project>/memory/`): owner profile, preferences, private references | Not required to work; docs/ are the source of truth |
 | `kotlinc` | Homebrew `kotlin` | `brew install kotlin` (ask the owner; ~470 MB) |
@@ -98,7 +98,7 @@ Read every file first or scan with NVIDIA SkillSpector (ask before installing it
 
 ## 9. Never in the repo
 
-Bot token, keystore, keystore password or path, IP addresses, the Termux user name, the SSH port, the bot's username, personal email. Check before committing:
+Bot token, keystore, keystore password or path, IP addresses, the Termux user name, the SSH port, the bot's username, personal email, Telegram user IDs and roommates' names (write "roommate, id hidden"). Check before committing:
 ```sh
 scripts/privacy-check.sh     # greps tracked files for the patterns in ~/.config/phone-cctv/private-patterns.txt
 ```

@@ -1,10 +1,10 @@
 # Status
 
-**Updated:** 2026-11-12 · **Installed on the phone:** 0.4.27 (commit `0fb3e53`, QUICKBOOT removed + Phase 5 review fixes)
+**Updated:** 2026-11-12 · **Installed on the phone:** 0.4.31 (commit `bdf901a`, roommates with roles)
 
 ## Current task
 
-**Task 8** (role-based routing in the bot; needs a second Telegram account). Task 7 done. Phase 5 (Tasks 1–6) is closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
+**Task 9** (docs/SECURITY.md, `/code-review high` on Phase 6, `/security-review`). Tasks 7–8 done. Phase 5 (Tasks 1–6) is closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
 
 ## Where we are
 
@@ -17,8 +17,9 @@
 | 5 Storage dashboard + daily summary | ✅ done 2026-11-12 (unprompted summary 09:00:15) |
 | 6 Housekeeping (drop `QUICKBOOT_POWERON`, uninstall Termux:Boot) + Phase 5 review | ✅ done 2026-11-11 (review fixes 1–6; PIN reboot passed) |
 | 7 Auth, Commands, RateLimiter (pure) | ✅ done 2026-11-11 |
-| 8 Role-based routing in the bot | 🔄 code pushed, phone check pending (second account) |
-| 9–22 | ⏳ |
+| 8 Role-based routing in the bot | ✅ done 2026-11-12 (roommate test passed; member currently revoked) |
+| 9 Phase 6 review + SECURITY.md | 🔄 current |
+| 10–22 | ⏳ |
 
 Phases 1–4: done (see `docs/ROADMAP.md`). Per-feature test status: `docs/FEATURES.md`.
 
@@ -32,11 +33,11 @@ The owner can't cut the Wi-Fi, so the planned outage re-test can't be run.
 ## Exact next step
 
 1. Phase 5 closed 2026-11-12.
-2. **Task 8** (`task-start docs/plans/phases-5-10.md 8`): wire Auth/Commands/RateLimiter into `Bot.kt` (Control methods take `chatId`), `users.json`, `/allow`, `/revoke`, `/users`. Phone check needs the owner's second Telegram account.
+2. **Task 9:** write `docs/SECURITY.md`; `/code-review high` on the Phase 6 diff (`9e76670..HEAD`); `/security-review`; each finding fixed (test + commit) or listed as an accepted risk. Then Phase 7 (Task 10).
 
 ## Waiting on the owner
 
-- Task 8 (soon): a second Telegram account for the roommate tests.
+- Roommate is revoked after the test; `/allow <id>` again when wanted (id: ask the owner; never in the repo).
 - Mobile data off: still to verify (docs/PHONE.md).
 - On the next real outage: nothing to do, but the log will show Task 3's and Task 4's untested lines (`running late command`, `net: outage cause:`).
 

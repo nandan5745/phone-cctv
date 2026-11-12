@@ -231,7 +231,7 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 **Files:** Modify `CameraService.kt` (`/status` line `Radios: Bluetooth off`), `AndroidManifest.xml` (`android.permission.BLUETOOTH`, normal permission), `docs/SECURITY.md` (phone checklist)
 
-- [ ] **Step 1:** Implement; push; CI green
+- [x] **Step 1:** Implement; push; CI green (94 tests; `core/Radios` + `RadiosTest`)
 - [ ] **Step 2: You on the phone:** Bluetooth off, NFC off (if present), location off, mobile data off, screen PIN set, unused apps disabled
 - [ ] **Step 3: Phone check:** `/status` shows `Radios: Bluetooth off`
 - [ ] **Step 4:** `/code-review high` + `/security-review` against `docs/SECURITY.md`; fixes or accepted risks

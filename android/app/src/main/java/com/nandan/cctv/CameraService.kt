@@ -41,6 +41,7 @@ import com.nandan.cctv.core.BatterySample
 import com.nandan.cctv.core.HeatMonitor
 import com.nandan.cctv.core.DailyStats
 import com.nandan.cctv.core.MotionDetector
+import com.nandan.cctv.core.Radios
 import com.nandan.cctv.core.mbPerDay
 import com.nandan.cctv.core.storageOutlook
 import com.nandan.cctv.core.formatIpv4
@@ -748,6 +749,7 @@ class CameraService : Service(), Bot.Control {
             "Recording: ${onOff(recordOn)}${if (photoOnly) " (photo-only fallback)" else ""}, alerts: ${onOff(alertsOn)}, videos: ${onOff(videosOn)}\n" +
             "RAM free: ${mi.availMem / 1_048_576} MB of ${mi.totalMem / 1_048_576} MB\n" +
             "Wi-Fi: ${wifiText()}\n" +
+            "${Radios.line(bluetoothOn())}\n" +
             "Camera: ${if (heatPaused) "PAUSED (too hot)" else if (camera != null || recorder != null) "${width}x$height" else "NOT RUNNING"}${if (recorder != null) ", recording now" else ""}"
     }
 
@@ -778,6 +780,12 @@ class CameraService : Service(), Bot.Control {
     override fun summary() { cam.post { bot.send(daily.summaryText(storageText())) } }
 
     override fun noteOffline(minutes: Long) { cam.post { daily.offlineMin += minutes; saveDaily() } }
+
+    private fun bluetoothOn(): Boolean? = try {
+        android.bluetooth.BluetoothAdapter.getDefaultAdapter()?.isEnabled
+    } catch (e: Exception) {
+        null
+    }
 
     private fun wifiInfo() = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo
 

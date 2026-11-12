@@ -59,6 +59,7 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `Commands.kt` | Parse `/name@bot arg rest`; members may use only `/start /help /snapshot /clip /last /status`. | `CommandsTest` (5) |
 | `ClipSlot.kt` | One `/clip` request at a time; a second asker is told to wait. | `ClipSlotTest` (2) |
 | `ConfigImport.kt` | `/sdcard` config imported only on first setup or the owner's `/reload`. | `ConfigImportTest` (3) |
+| `Radios.kt` | The `/status` radio line (`Radios: Bluetooth off`). | `RadiosTest` (1) |
 | `RateLimiter.kt` | At most N events per sliding window per user id; forgets expired ids beyond 256. | `RateLimiterTest` (4) |
 | `Routing.kt` | Message → ignore (not a private chat) / stranger notice / unknown command / "owner only" / run; member rate limit (owner exempt); member `/status` without the Wi-Fi line; stranger notices (once a day each, ≤ 5 an hour). | `RoutingTest` (9) |
 | `SendPolicy.kt` | After a failed send: retry (network, 429, 5xx) or drop (other 4xx, missing file). | `SendPolicyTest` (5) |
@@ -148,7 +149,7 @@ The owner (`telegramUserId`) and members added with `/allow` get answers, in pri
 | `/snapshot` | Photo now | member | no (skipped, you're told) |
 | `/clip N` | Record N s (1–30) and send it; "Busy …" if another `/clip` is waiting | member | no |
 | `/last` | Newest saved clip | member | yes |
-| `/status` | Uptime, battery, temps, storage, switches, RAM, Wi-Fi (network, IP, signal; owner only), camera | member | yes |
+| `/status` | Uptime, battery, temps, storage, switches, RAM, Wi-Fi (network, IP, signal; owner only), radios (Bluetooth), camera | member | yes |
 | `/record on\|off` | Record clips on motion | owner | yes |
 | `/alerts on\|off` | Photo alerts on motion | owner | yes |
 | `/videos on\|off` | Also send the motion clip | owner | yes |

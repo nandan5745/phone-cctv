@@ -110,5 +110,6 @@ Only two temperature sensors exist. No gyroscope, compass or barometer.
 | Location | Off (owner checked 2026-11-11) |
 | NFC | Not present on this phone |
 | Screen lock PIN | **Set** 2026-11-11, secure start-up "No". Reboot left locked (23:37): `receiver: android.net.wifi.WIFI_STATE_CHANGED (uptime 0 min) -> starting service`, `termux: asked to run start-sshd`, `started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)`, `camera started 640x480`, `sent message on try 3`; SSH worked |
-| Mobile data | To verify (Task 11) |
-| Unused preinstalled apps disabled | To do |
+| Mobile data | No SIM, so none |
+| Unused preinstalled apps disabled | 2026-11-13: LYF Store, JioDrive Setup, Wireless update, Email, Exchange Services, Calendar, Camera, Messaging, Browser, Google Indic Keyboard disabled; Android Keyboard (AOSP) is the default (type `sshd` in Termux with it). **Can't be disabled** (greyed out): Sales Tracker, FotaProvider, System update. Kept: HeartbeatSynchronization (possibly alarm alignment). Locked reboot afterwards OK |
+| SIM | None (no mobile data) |

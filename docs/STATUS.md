@@ -1,10 +1,10 @@
 # Status
 
-**Updated:** 2026-11-12 · **Installed on the phone:** 0.4.34 (commit `91d5f1b`, SSH on demand)
+**Updated:** 2026-11-13 · **Installed on the phone:** 0.4.37 (commit `1d647ca`, Phase 7 review fixes)
 
 ## Current task
 
-**Task 11** (Phase 7: radio status line, phone checklist, `/code-review high` + security pass). Task 10 done; Phase 6 closed 2026-11-12. **SSH is closed by default: send `/sshd on N` before any SSH or deploy.** Phase 5 (Tasks 1–6) is closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
+**Task 12** (Phase 8: `grilling` on the motion design before coding zones, background model, darkness). Phases 5–7 closed (Phase 7 on 2026-11-13). **SSH is closed by default: send `/sshd on N` before any SSH or deploy.** Phase 5 (Tasks 1–6) is closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
 
 ## Where we are
 
@@ -20,8 +20,9 @@
 | 8 Role-based routing in the bot | ✅ done 2026-11-12 (roommate test passed; member currently revoked) |
 | 9 Phase 6 review + SECURITY.md | ✅ done 2026-11-12 (10 findings fixed; security review = manual pass) |
 | 10 SSH on demand | ✅ done 2026-11-12 (off/on/auto-off/reboot checked) |
-| 11 Hardening checklist + radio status line | ⏭ next |
-| 12–22 | ⏳ |
+| 11 Hardening checklist + radio status line | ✅ done 2026-11-13 (review: 5 fixed, 2 accepted; apps disabled; locked reboot OK) |
+| 12 Phase 8 design grilling | ⏭ next |
+| 13–22 | ⏳ |
 
 Phases 1–4: done (see `docs/ROADMAP.md`). Per-feature test status: `docs/FEATURES.md`.
 
@@ -35,7 +36,7 @@ The owner can't cut the Wi-Fi, so the planned outage re-test can't be run.
 ## Exact next step
 
 1. Phase 5 closed 2026-11-12.
-2. **Task 11** (`task-start docs/plans/phases-5-10.md 11`): `/status` line `Radios: Bluetooth off` (normal `BLUETOOTH` permission), the phone checklist in SECURITY.md (Bluetooth/location off and PIN already done; mobile data and unused apps still to check), then `/code-review high` + security pass on Phase 7.
+2. **Task 12:** run `grilling` on Tasks 13–15 with the curtain data (445 triggers 06:40–09:16 on 2026-11-08); record changed decisions at the top of the plan before coding.
 
 ## Waiting on the owner
 

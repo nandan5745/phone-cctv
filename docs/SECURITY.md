@@ -66,6 +66,8 @@ Threat model for the phone CCTV, written in Task 9 (2026-11-12) and checked by `
 | No certificate pinning | Pinning would break the bot if Telegram changes certificate authority; cut for time |
 | The `/sshd on` reply can't confirm sshd really started ("Asked Termux to start SSH …") | The check would need the SSH port inside the app; a failed start shows as a failed `ssh` |
 | An sshd started at boot by a version before Task 10 had no deadline | One-time transition; gone after the 2026-11-12 reboot |
+| Sales Tracker, FotaProvider, System update can't be disabled (Disable greyed out: system apps, would need root) | No SIM; this phone gets no updates any more; the CCTV app doesn't depend on them |
+| HeartbeatSynchronization kept on purpose | May be Spreadtrum's alarm-alignment service, and the 1-minute watchdog depends on alarms |
 | `allow-external-apps = true` in Termux | Any app with Termux's RUN_COMMAND permission could run code as Termux; the phone stays app-free |
 | sshd running while `/sshd on` is active (old frozen OpenSSH from the Android 5 Termux repo) | Key-only, owner opens it for minutes at a time |
 | A member's Telegram account is taken over | The attacker gets what a member gets (photos, `/status`); the owner revokes |
@@ -80,7 +82,7 @@ Threat model for the phone CCTV, written in Task 9 (2026-11-12) and checked by `
 | NFC | Not present |
 | Mobile data | No SIM in the phone |
 | Keep Wi-Fi on during sleep: Always | ✅ owner 2026-11-11 |
-| Unused preinstalled apps disabled | Recommended list given 2026-11-13 (store, cloud, update and tracking apps, media apps, live wallpapers); owner to disable, then a reboot check |
+| Unused preinstalled apps disabled | ✅ 2026-11-13: LYF Store, JioDrive Setup, Wireless update, Email, Exchange Services, Calendar, Camera, Messaging, Browser, Google Indic Keyboard (Android Keyboard (AOSP) is the default). Locked reboot afterwards: CCTV came back (`00:32:00 started: phone rebooted …`, `00:33:00 camera started`) |
 | No other apps installed | ✅ only CCTV and Termux added (Termux:Boot removed 2026-11-11) |
 
 ## Review log

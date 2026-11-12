@@ -227,15 +227,15 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 - [x] **Step 5: Phone check:** (done 2026-11-12, evidence in docs/FEATURES.md) `/sshd off` → `nc -z` to the phone's SSH port fails from the Mac; `/sshd on 5` → `ssh phone true` works; 6 min later → fails again (log `termux: … stop-sshd (auto-off)`); reboot → SSH closed until `/sshd on`
 - [x] **Step 6: Commit** `feat: SSH on demand with auto-off` (`91d5f1b`)
 
-### Task 11: Hardening checklist + status line
+### Task 11: Hardening checklist + status line ✅ (done 2026-11-13)
 
 **Files:** Modify `CameraService.kt` (`/status` line `Radios: Bluetooth off`), `AndroidManifest.xml` (`android.permission.BLUETOOTH`, normal permission), `docs/SECURITY.md` (phone checklist)
 
 - [x] **Step 1:** Implement; push; CI green (94 tests; `core/Radios` + `RadiosTest`)
-- [ ] **Step 2: You on the phone:** Bluetooth off, NFC off (if present), location off, mobile data off, screen PIN set, unused apps disabled (2026-11-13: all done except unused apps; no SIM, no NFC; list in docs/SECURITY.md)
+- [x] **Step 2: You on the phone:** Bluetooth off, NFC off (if present), location off, mobile data off, screen PIN set, unused apps disabled (2026-11-13: done; no SIM, no NFC; 3 system apps can't be disabled; list in docs/SECURITY.md and docs/PHONE.md; locked reboot OK)
 - [x] **Step 3: Phone check:** `/status` shows `Radios: Bluetooth off` (owner, 2026-11-12, 0.4.36)
 - [x] **Step 4:** `/code-review high` + `/security-review` against `docs/SECURITY.md`; fixes or accepted risks (7 findings: 5 fixed, 2 accepted; security pass manual)
-- [ ] **Step 5: Commit** `feat: radio status; security checklist`
+- [x] **Step 5: Commit** `feat: radio status; security checklist` (`7ee014c`, review fixes `1d647ca`)
 
 ---
 

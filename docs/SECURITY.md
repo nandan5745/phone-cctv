@@ -50,6 +50,7 @@ Threat model for the phone CCTV, written in Task 9 (2026-11-12) and checked by `
 | A member adds the bot to a group and uses it there | Ignored (log `ignored message from …: chat type group`), also for the owner |
 | Someone floods the bot | After 10 messages a minute their messages are ignored (one log line a minute); stranger ids are forgotten after expiry |
 | A roommate moves out | `/revoke ID`: no more alerts or answers, including alerts already queued during an outage (recipients are read when an alert is sent) |
+| The bot is down and SSH is off | Last resort: unlock the phone (PIN), open Termux, type `sshd` (docs/WORKFLOW.md §3) |
 | The token leaks or dies | Revoke it in BotFather. The app no longer imports a new config on open once it has a token, so: **clear the app's data** (Settings → Apps → CCTV → Clear data) **or reinstall**, then run `scripts/set-telegram.sh` again (first setup) and `/allow` members again (their list is in app data) |
 | Another app on the phone writes `config.json` and opens the CCTV app | Ignored and deleted; the owner gets "⚠️ A config.json appeared … deleted without importing it" |
 | Someone scripts many throwaway accounts | At most 5 "Unknown user" notices an hour |

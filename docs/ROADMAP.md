@@ -12,7 +12,7 @@ Copied from the approved planning document, without private details. Step-by-ste
 | 4 | Reliability: boot/update start, alarm watchdog, sshd at boot | ✅ done 2026-11-07 (7-day soak still to come) |
 | 5 | Safety and operations | ✅ done 2026-11-12 (Task 3 partly untested; Task 4 outage cause untested until a real outage) |
 | 6 | Roommates and roles | ✅ done 2026-11-12 (roommate test passed; review: 10 findings fixed) |
-| 7 | Security hardening, SSH on demand, SECURITY.md | 🔄 Task 10 (SSH on demand) in progress |
+| 7 | Security hardening, SSH on demand, SECURITY.md | 🔄 Task 10 done (SSH on demand); Task 11 next |
 | 8 | Better motion detection (zones, background model, darkness, IR test) | ⏳ not started |
 | 9 | Native phone features (`/speak`, tamper alert) | ⏳ not started |
 | 10 | Tests, metrics, docs, 7-day soak, results | ⏳ not started |

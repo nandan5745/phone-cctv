@@ -47,6 +47,8 @@ ssh phone 'am start -a android.intent.action.VIEW -t application/vnd.android.pac
 ```
 **SSH is closed by default** (Task 10): first send `/sshd on 30` in Telegram (it closes by itself after 30 min, `/sshd off` sooner). For a long session at home, `sshdAtBoot: true` in the config brings back sshd at boot.
 
+**Last resort, if the bot is down and SSH is off:** unlock the phone, open **Termux**, type `sshd` and press Enter. SSH works until the next reboot (or until a `/sshd off` / auto-off once the bot is back). Then read `/sdcard/cctv/log.txt` to see why the bot is down.
+
 On the phone: unlocked → **Install** → **Done**. The update restarts the app by itself (`started: app updated`). If `ssh`/`scp` times out once, retry (the phone's Wi-Fi ignores the first packets when idle).
 
 ## 4. Reading the log over SSH

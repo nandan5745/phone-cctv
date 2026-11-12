@@ -213,7 +213,7 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 ## Phase 7: Security hardening
 
-### Task 10: SSH on demand
+### Task 10: SSH on demand ✅ (done 2026-11-12)
 
 **Files:** Create `phone/termux/start-sshd`, `phone/termux/stop-sshd`; Modify `Termux.kt`, `CameraService.kt`, `Bot.kt`, `Config.kt` (`sshdAtBoot`, default `false`)
 
@@ -224,8 +224,8 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 
 - [x] **Step 1: Tests** (`CommandsTest`): `sshdOnDefault30`; `sshdOnClamped` (`"on 500"` → 120, `"on 1"` → 5); `sshdOffIsNull`; `sshdGarbageDefaults30`
 - [x] **Step 2: Run** → FAIL. **Step 3: Implement**; `stop-sshd` kills the PID in `$PREFIX/var/run/sshd.pid` (existing sessions survive); copy both scripts to the phone over SSH **before** installing the APK. **Step 4: Run** → pass (93 tests; copied 2026-11-12 20:34; `Termux.run` accepts only the two script names)
-- [ ] **Step 5: Phone check:** `/sshd off` → `nc -z` to the phone's SSH port fails from the Mac; `/sshd on 5` → `ssh phone true` works; 6 min later → fails again (log `termux: … stop-sshd (auto-off)`); reboot → SSH closed until `/sshd on`
-- [ ] **Step 6: Commit** `feat: SSH on demand with auto-off`
+- [x] **Step 5: Phone check:** (done 2026-11-12, evidence in docs/FEATURES.md) `/sshd off` → `nc -z` to the phone's SSH port fails from the Mac; `/sshd on 5` → `ssh phone true` works; 6 min later → fails again (log `termux: … stop-sshd (auto-off)`); reboot → SSH closed until `/sshd on`
+- [x] **Step 6: Commit** `feat: SSH on demand with auto-off` (`91d5f1b`)
 
 ### Task 11: Hardening checklist + status line
 

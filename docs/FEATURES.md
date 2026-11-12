@@ -37,7 +37,7 @@ Every feature and command so far (Phases 1–5). **Tested on phone?** yes = seen
 | `/record`, `/alerts`, `/videos` on/off | Switches saved in private prefs | yes | 2026-11-11 17:51:01 `/alerts on`, `/videos on`, `/record on` | |
 | `/log` | Last 30 log lines | yes | 2026-11-06 23:46:09 `telegram: command '/log'` | |
 | `/reload` | Re-reads settings | yes | 2026-11-06 23:47:10 `telegram: command '/reload'` | |
-| `/sshd on [min]` / `/sshd off`, auto-off | Termux runs `start-sshd`/`stop-sshd`; deadline in prefs checked every minute; no sshd at boot unless `sshdAtBoot` | no | — | Task 10; phone check pending |
+| `/sshd on [min]` / `/sshd off`, auto-off | Termux runs `start-sshd`/`stop-sshd`; deadline in prefs checked every minute; no sshd at boot unless `sshdAtBoot` | yes | 2026-11-12, 0.4.34: `20:38:47 command '/sshd off'` → `termux: asked to run stop-sshd (/sshd off) -> sent` (port closed 20:38:54); `20:40:47 command '/sshd on 5'` → `termux: asked to run start-sshd (/sshd on 5) -> sent` (port open 20:40:54); `20:46:11 termux: asked to run stop-sshd (auto-off) -> sent` (port closed 20:46:22); reboot, locked: `20:47:53 started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)` and no `start-sshd` line, port stayed closed until `20:50:40 command '/sshd on 10'` (open 20:50:45) | Port state watched from the Mac with `nc -z` |
 | Back-online message | "🟢 CCTV back online (vX) Why: …" on every start | yes | 2026-11-10 10:55:18 `started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)` + 10:55:28 `sent message on try 3` | |
 | Battery warnings | Low voltage (< 3.6 V), unplugged, back on charger | partly | Drain test 2026-11-09 20:00 → 2026-11-10 01:07 (`3.18V`) | Successful sends aren't logged; confirm from Telegram |
 
@@ -50,7 +50,7 @@ Every feature and command so far (Phases 1–5). **Tested on phone?** yes = seen
 | 1-minute watchdog | AlarmManager restarts the service if it isn't running | yes | 2026-11-07 00:45:10 `started: 1-minute check found the service stopped` | START_STICKY doesn't work here (S6) |
 | `/teststop` | Stops the service to test the watchdog | yes | 2026-11-07 00:44:21 `teststop: stopping service` → 00:45:10 restarted | Screen on and off |
 | `/testkill` | Kills the process to test recovery | yes | 2026-11-07 00:33:13 `testkill: killing own process` → 00:37:52 `5-minute check found the service stopped` | Not re-run since the check became 1 minute |
-| sshd at boot | First start per boot asks Termux (RUN_COMMAND) to run `start-sshd` | yes | 2026-11-10 10:55:17 `termux: asked to run start-sshd (first start since boot) -> sent` + SSH works | Also works with the PIN set and the phone locked (2026-11-11 23:37:04). Becomes on-demand in Phase 7 |
+| sshd at boot | Only with `sshdAtBoot: true` (Task 10): first start per boot asks Termux (RUN_COMMAND) to run `start-sshd` | yes | 2026-11-10 10:55:17 `termux: asked to run start-sshd (first start since boot) -> sent` + SSH works | Also works with the PIN set and the phone locked (2026-11-11 23:37:04). Becomes on-demand in Phase 7 |
 
 ## Safety and operations (Phase 5, Tasks 1–3)
 

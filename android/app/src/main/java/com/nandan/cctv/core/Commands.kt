@@ -29,5 +29,15 @@ object Commands {
         return Command(name, arg, rest)
     }
 
+    /**
+     * "/sshd on [minutes]" → minutes (default 30, clamped 5..120); "/sshd off" → null.
+     * Plain "/sshd" or anything unclear means on for 30 minutes.
+     */
+    fun sshdMinutes(arg: String?, rest: String): Int? {
+        if (arg == "off") return null
+        val n = rest.split(Regex("\\s+")).getOrNull(1)?.toIntOrNull() ?: return 30
+        return n.coerceIn(5, 120)
+    }
+
     fun allowed(role: Role, name: String): Boolean = role == Role.OWNER || name in MEMBER
 }

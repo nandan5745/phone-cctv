@@ -1,0 +1,7 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# stop-sshd: run by the CCTV app through Termux RUN_COMMAND (/sshd off, or the auto-off deadline).
+# Stops the sshd listener so nothing listens on the network; SSH sessions already open keep running.
+# Lives in ~/.termux/boot/ on the phone. Docs: docs/SECURITY.md.
+PIDFILE=/data/data/com.termux/files/usr/var/run/sshd.pid
+[ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null
+rm -f "$PIDFILE"

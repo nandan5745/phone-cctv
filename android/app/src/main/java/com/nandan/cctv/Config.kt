@@ -49,6 +49,9 @@ class Config private constructor(j: JSONObject) {
     val cpuEmergencyC: Double = j.optDouble("cpuEmergencyC", 60.0)
     val cpuResumeC: Double = j.optDouble("cpuResumeC", 55.0)
 
+    /** Start sshd at every boot (development at home). Default off: SSH only after /sshd on (docs/SECURITY.md). */
+    val sshdAtBoot: Boolean = j.optBoolean("sshdAtBoot", false)
+
     /** Hour of the day (0–23, phone time) when the daily summary is sent. */
     val dailySummaryHour: Int = j.optInt("dailySummaryHour", 9).coerceIn(0, 23)
 
@@ -57,7 +60,7 @@ class Config private constructor(j: JSONObject) {
         "pixelDiff=$motionPixelDiff threshold=$motionThreshold frames=$motionFrames fps=$analyzeFps " +
             "clip=${clipSeconds}s cap=${storageCapMB}MB minFree=${minFreeMB}MB cooldown=${alertCooldownSeconds}s " +
             "temp=$tempWarnC/$tempCriticalC/$tempEmergencyC/$tempResumeC°C cpu=$cpuWarnC/$cpuCriticalC/$cpuEmergencyC/$cpuResumeC°C " +
-            "summary=${dailySummaryHour}h telegram=${if (telegramBotToken.isNotEmpty() && telegramUserId != 0L) "set" else "not set"}"
+            "summary=${dailySummaryHour}h sshdAtBoot=$sshdAtBoot telegram=${if (telegramBotToken.isNotEmpty() && telegramUserId != 0L) "set" else "not set"}"
 
     companion object {
         /** [ignoredImport] = a config.json on /sdcard was deleted without importing it. */

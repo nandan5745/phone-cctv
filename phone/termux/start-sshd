@@ -1,0 +1,6 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# start-sshd: run by the CCTV app through Termux RUN_COMMAND (/sshd on, or at boot if sshdAtBoot).
+# Keeps Termux awake and starts SSH (key login only). Lives in ~/.termux/boot/ on the phone.
+# Docs: docs/WORKFLOW.md §3, docs/SECURITY.md.
+termux-wake-lock
+sshd

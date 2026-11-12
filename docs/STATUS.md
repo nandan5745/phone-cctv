@@ -1,10 +1,10 @@
 # Status
 
-**Updated:** 2026-11-12 · **Installed on the phone:** 0.4.31 (commit `bdf901a`, roommates with roles)
+**Updated:** 2026-11-12 · **Installed on the phone:** 0.4.33 (commit `a2a2ab8`, Phase 6 review fixes)
 
 ## Current task
 
-**Task 9** (docs/SECURITY.md, `/code-review high` on Phase 6, `/security-review`). Tasks 7–8 done. Phase 5 (Tasks 1–6) is closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
+**Task 10** (Phase 7: SSH on demand). Phase 6 (Tasks 7–9) closed 2026-11-12. Phase 5 (Tasks 1–6) is closed; Task 3 is closed **partly untested** (below); Task 4's outage-cause line is untested until a real outage. "The owner" = the person running this project (the user of the Claude session); they unlock the phone and use Telegram.
 
 ## Where we are
 
@@ -18,8 +18,9 @@
 | 6 Housekeeping (drop `QUICKBOOT_POWERON`, uninstall Termux:Boot) + Phase 5 review | ✅ done 2026-11-11 (review fixes 1–6; PIN reboot passed) |
 | 7 Auth, Commands, RateLimiter (pure) | ✅ done 2026-11-11 |
 | 8 Role-based routing in the bot | ✅ done 2026-11-12 (roommate test passed; member currently revoked) |
-| 9 Phase 6 review + SECURITY.md | 🔄 current |
-| 10–22 | ⏳ |
+| 9 Phase 6 review + SECURITY.md | ✅ done 2026-11-12 (10 findings fixed; security review = manual pass) |
+| 10 SSH on demand | 🔄 code ready, phone check pending |
+| 11–22 | ⏳ |
 
 Phases 1–4: done (see `docs/ROADMAP.md`). Per-feature test status: `docs/FEATURES.md`.
 
@@ -33,7 +34,7 @@ The owner can't cut the Wi-Fi, so the planned outage re-test can't be run.
 ## Exact next step
 
 1. Phase 5 closed 2026-11-12.
-2. **Task 9:** write `docs/SECURITY.md`; `/code-review high` on the Phase 6 diff (`9e76670..HEAD`); `/security-review`; each finding fixed (test + commit) or listed as an accepted risk. Then Phase 7 (Task 10).
+2. **Task 10:** install the build; owner sends `/sshd off` → SSH port closed; `/sshd on 5` → `ssh phone true` works; ~6 min later closed again (log `termux: asked to run stop-sshd (auto-off)`); reboot → closed until `/sshd on`. **From now on every SSH deploy needs `/sshd on` first.**
 
 ## Waiting on the owner
 

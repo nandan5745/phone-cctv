@@ -45,6 +45,8 @@ gh run download <run-id> --name cctv-apk --dir .deploy
 scp .deploy/cctv.apk phone:/sdcard/Download/cctv.apk
 ssh phone 'am start -a android.intent.action.VIEW -t application/vnd.android.package-archive -d file:///sdcard/Download/cctv.apk'
 ```
+**SSH is closed by default** (Task 10): first send `/sshd on 30` in Telegram (it closes by itself after 30 min, `/sshd off` sooner). For a long session at home, `sshdAtBoot: true` in the config brings back sshd at boot.
+
 On the phone: unlocked → **Install** → **Done**. The update restarts the app by itself (`started: app updated`). If `ssh`/`scp` times out once, retry (the phone's Wi-Fi ignores the first packets when idle).
 
 ## 4. Reading the log over SSH

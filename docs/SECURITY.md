@@ -36,7 +36,7 @@ Threat model for the phone CCTV, written in Task 9 (2026-11-12) and checked by `
 | Network | No listening port in the app; outgoing HTTPS to Telegram only (plus one plain-HTTP connectivity check during an outage) | `Bot`, `TelegramApi` |
 | `BootReceiver` (exported) | Only system-protected broadcasts (the unprotected `QUICKBOOT_POWERON` was removed in Task 6); a fake broadcast could at most start the CCTV | `AndroidManifest.xml` |
 | Termux `RUN_COMMAND` | The app runs one fixed script path; no user text reaches it | `Termux.kt` |
-| sshd | Key-only login. **Today always on after boot**; Phase 7 makes it on-demand with auto-off | Termux, Task 10 |
+| sshd | Key-only login. **Off by default** since Task 10: `/sshd on [min]` (owner only, 5–120 min, default 30) starts it, it stops by itself at the deadline (kept in prefs, survives restarts), `/sshd off` stops it now; not started at boot unless `sshdAtBoot` | `Termux.kt` (fixed script names only), `phone/termux/` |
 | Clips on `/sdcard` | Screen PIN; no other apps installed | Phone settings |
 | Updates | Signed with the fixed key held only in GitHub secrets | CI |
 | Repo | Private values listed in a local patterns file; `scripts/privacy-check.sh` before every commit | `scripts/` |
@@ -64,7 +64,7 @@ Threat model for the phone CCTV, written in Task 9 (2026-11-12) and checked by `
 | Clips readable by any app with storage permission | Phone kept app-free; moving clips to private storage is cut for time |
 | No certificate pinning | Pinning would break the bot if Telegram changes certificate authority; cut for time |
 | `allow-external-apps = true` in Termux | Any app with Termux's RUN_COMMAND permission could run code as Termux; the phone stays app-free |
-| sshd always on (until Phase 7) | Key-only; becomes on-demand in Task 10 |
+| sshd running while `/sshd on` is active (old frozen OpenSSH from the Android 5 Termux repo) | Key-only, owner opens it for minutes at a time |
 | A member's Telegram account is taken over | The attacker gets what a member gets (photos, `/status`); the owner revokes |
 
 ## Review log

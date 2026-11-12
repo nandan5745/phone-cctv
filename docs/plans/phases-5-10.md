@@ -222,8 +222,8 @@ Context: unexplained outages to diagnose — Nov 7 17:11–18:27, Nov 8 20:18–
 - `Commands` arg: `/sshd on [minutes]` (default 30, clamped 5..120), `/sshd off`. Parsing helper `fun sshdMinutes(arg: String?, rest: String): Int?` in `core/Commands.kt` (null = off).
 - Auto-off deadline stored in prefs `"sshdUntil"`; the 1-minute battery watcher runs `stop-sshd` when past it (survives service restarts).
 
-- [ ] **Step 1: Tests** (`CommandsTest`): `sshdOnDefault30`; `sshdOnClamped` (`"on 500"` → 120, `"on 1"` → 5); `sshdOffIsNull`; `sshdGarbageDefaults30`
-- [ ] **Step 2: Run** → FAIL. **Step 3: Implement**; `stop-sshd` kills the PID in `$PREFIX/var/run/sshd.pid` (existing sessions survive); copy both scripts to the phone over SSH **before** installing the APK. **Step 4: Run** → pass
+- [x] **Step 1: Tests** (`CommandsTest`): `sshdOnDefault30`; `sshdOnClamped` (`"on 500"` → 120, `"on 1"` → 5); `sshdOffIsNull`; `sshdGarbageDefaults30`
+- [x] **Step 2: Run** → FAIL. **Step 3: Implement**; `stop-sshd` kills the PID in `$PREFIX/var/run/sshd.pid` (existing sessions survive); copy both scripts to the phone over SSH **before** installing the APK. **Step 4: Run** → pass (93 tests; copied 2026-11-12 20:34; `Termux.run` accepts only the two script names)
 - [ ] **Step 5: Phone check:** `/sshd off` → `nc -z` to the phone's SSH port fails from the Mac; `/sshd on 5` → `ssh phone true` works; 6 min later → fails again (log `termux: … stop-sshd (auto-off)`); reboot → SSH closed until `/sshd on`
 - [ ] **Step 6: Commit** `feat: SSH on demand with auto-off`
 

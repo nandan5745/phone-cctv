@@ -76,7 +76,8 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `.github/workflows/build.yml` | CI: JDK 17, Gradle 8.10.2, decode keystore secret, `testReleaseUnitTest assembleRelease`, upload `cctv-apk`. |
 | `scripts/jvmtest.sh` | Local JVM tests for `core` with `kotlinc` (jars from Maven Central, SHA-1 checked). |
 | `scripts/deploy.sh` | Download newest APK, copy to the phone, wait for unlock, open installer. |
-| `scripts/set-telegram.sh` | Puts the bot token + your user ID on the phone without printing the token. |
+| `scripts/set-telegram.sh` | First setup only: puts the bot token + your user ID on the phone without printing the token. |
+| `phone/termux/start-sshd`, `stop-sshd` | Copied to `~/.termux/boot/` on the phone; run by the app through Termux RUN_COMMAND. `stop-sshd` kills the listener only (open sessions survive). |
 
 ## 3. Threads
 
@@ -96,7 +97,8 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | Phone boots | `BOOT_COMPLETED` never arrives on this phone. `WIFI_STATE_CHANGED` (or network/charger/unlock/storage events) wakes `BootReceiver` within seconds; if the service isn't running it starts it. Reason "phone rebooted (first signal: …)". |
 | App updated | `MY_PACKAGE_REPLACED` → service starts by itself ("app updated"). |
 | Service/process dies | Android's START_STICKY restart doesn't happen on this phone. A **1-minute AlarmManager** check starts the service if it isn't running. |
-| First start after each boot | Asks Termux to run `start-sshd` (wake lock + sshd). Phase 7 changes this to on-demand. |
+| First start after each boot | Only with `sshdAtBoot: true`: asks Termux to run `start-sshd`. By default SSH stays closed after a boot until `/sshd on`. |
+| Every minute | Past the `/sshd on` deadline (prefs `sshdUntil`, survives restarts) → `stop-sshd` (log `termux: asked to run stop-sshd (auto-off)`). |
 | Every start | "🟢 CCTV back online (vX) Why: … Wi-Fi: <network>, IP <address> …" sent, retried until Telegram is reachable; the text is built when it goes out, so the IP is current. |
 | Too hot | A HeatMonitor reaches EMERGENCY → recording stopped, camera closed, watchdog won't restart it; resumes when every sensor is below its resume point. At service start the CPU is read once: at or above its resume line the camera starts paused (no message). |
 | Clip finished | Camera released and reopened (~0.3 s), 1.5 s warm-up, detection resumes. |
@@ -111,7 +113,7 @@ Telegram API ◀── outgoing HTTPS only. The app opens no ports.
 | `clips/YYYY-MM-DD_HH-MM-SS.mp4` | The clip (~2.3 MB per 20 s). |
 | `config.json` | Only briefly: dropped there, then moved to app-private storage. |
 
-App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the token), `files/users.json` (members added with `/allow`; written via a temp file), shared prefs `state` (record/alerts/videos switches, `sshdBootMin`, `daily` = DailyStats JSON, `dailySentDay`).
+App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the token), `files/users.json` (members added with `/allow`; written via a temp file), shared prefs `state` (record/alerts/videos switches, `sshdBootMin`, `sshdUntil`, `daily` = DailyStats JSON, `dailySentDay`).
 
 ## 6. Config keys (`config.json`, all optional)
 
@@ -130,6 +132,7 @@ App-private (`/data/data/com.nandan.cctv/`): `files/config.json` (includes the t
 | `tempWarnC` / `tempCriticalC` / `tempEmergencyC` / `tempResumeC` | 40 / 45 / 50 / 42 | Battery temperature levels (°C). |
 | `cpuWarnC` / `cpuCriticalC` / `cpuEmergencyC` / `cpuResumeC` | 52 / 55 / 60 / 55 | Processor (`sensor_arm`) levels (°C), measured 2026-11-11. |
 | `dailySummaryHour` | 9 | Hour (0–23, phone time) for the daily summary. |
+| `sshdAtBoot` | false | Start sshd at every boot (development at home). |
 
 How the levels move (HeatMonitor, hysteresis 2 °C): a level is entered as soon as its threshold is reached; it is left only below an exit point. CPU: WARNING exits below 50, CRITICAL below 53, EMERGENCY below 55 (= resume; the camera restarts and the state drops to CRITICAL if the reading is 53–54.9, without a new message). Battery: exits below 38 / 43 / 42. Messages: on every rise, "❄️ … camera back on" when leaving EMERGENCY, "✅ … normal" on reaching NORMAL.
 
@@ -155,7 +158,7 @@ The owner (`telegramUserId`) and members added with `/allow` get answers, in pri
 | `/allow ID` | Add a member (they get "✅ You can now use this camera") | owner | yes |
 | `/revoke ID` | Remove a member | owner | yes |
 | `/users` | List owner and members | owner | yes |
-| `/sshd` | Ask Termux to start sshd | owner | no |
+| `/sshd on [min]`, `/sshd off` | SSH on for N minutes (default 30, 5–120; plain `/sshd` = on 30), then off by itself; off now | owner | no |
 | `/testkill` | Crash the app on purpose | owner | no |
 | `/teststop` | Stop the service (alarm restarts it) | owner | no |
 | `/testtemp C`, `/testtemp cpu C` | Fake a temperature for 3 checks | owner | no |
@@ -182,7 +185,7 @@ The owner (`telegramUserId`) and members added with `/allow` get answers, in pri
 | `telegram: poll failed (N)` / `reachable again after N` / `outage HH:mm-HH:mm, N motions[, cause: …]` | Connection loss and recovery. |
 | `net: outage cause: … (wifi …, check page …)` / `net: check page failed: <error>` | After 2 min offline, one check of Wi-Fi + `http://connectivitycheck.gstatic.com/generate_204` (204 = internet fine, other code = login page, no answer = no internet; the error tells DNS from timeout). |
 | `telegram: tg-text/tg-media queue full, dropped oldest` | Send queue overflow. |
-| `termux:` | sshd start request. |
+| `termux: asked to run start-sshd/stop-sshd (<why>)` | SSH on/off requests (`/sshd on N`, `/sshd off`, `auto-off`, `first start since boot`). |
 | `storage cap:` / `deleting broken file` / `startup cleanup:` | Storage housekeeping. |
 | `no frames for` / `switching to 1px overlay` | Camera watchdog and fallback. |
 | `CRASH in thread` | Uncaught exception (stack trace follows). |

@@ -37,4 +37,28 @@ class CommandsTest {
     fun memberCanUseMemberCommands() {
         for (c in Commands.MEMBER) assertTrue(c, Commands.allowed(Role.MEMBER, c))
     }
+
+    @Test
+    fun sshdOnDefault30() {
+        assertEquals(30, Commands.sshdMinutes("on", "on"))
+        assertEquals(30, Commands.sshdMinutes(null, ""))       // plain /sshd = on for 30 min
+    }
+
+    @Test
+    fun sshdOnClamped() {
+        assertEquals(120, Commands.sshdMinutes("on", "on 500"))
+        assertEquals(5, Commands.sshdMinutes("on", "on 1"))
+        assertEquals(45, Commands.sshdMinutes("on", "on 45"))
+    }
+
+    @Test
+    fun sshdOffIsNull() {
+        assertNull(Commands.sshdMinutes("off", "off"))
+    }
+
+    @Test
+    fun sshdGarbageDefaults30() {
+        assertEquals(30, Commands.sshdMinutes("on", "on soon"))
+        assertEquals(30, Commands.sshdMinutes("maybe", "maybe"))
+    }
 }

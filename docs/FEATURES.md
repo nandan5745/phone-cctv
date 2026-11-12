@@ -37,7 +37,7 @@ Every feature and command so far (Phases 1–5). **Tested on phone?** yes = seen
 | `/record`, `/alerts`, `/videos` on/off | Switches saved in private prefs | yes | 2026-11-11 17:51:01 `/alerts on`, `/videos on`, `/record on` | |
 | `/log` | Last 30 log lines | yes | 2026-11-06 23:46:09 `telegram: command '/log'` | |
 | `/reload` | Re-reads settings | yes | 2026-11-06 23:47:10 `telegram: command '/reload'` | |
-| `/sshd` | Asks Termux to start sshd | no | — | Never sent; same code path as the boot start (yes) |
+| `/sshd on [min]` / `/sshd off`, auto-off | Termux runs `start-sshd`/`stop-sshd`; deadline in prefs checked every minute; no sshd at boot unless `sshdAtBoot` | no | — | Task 10; phone check pending |
 | Back-online message | "🟢 CCTV back online (vX) Why: …" on every start | yes | 2026-11-10 10:55:18 `started: phone rebooted (first signal: WIFI_STATE_CHANGED, 0 min after boot)` + 10:55:28 `sent message on try 3` | |
 | Battery warnings | Low voltage (< 3.6 V), unplugged, back on charger | partly | Drain test 2026-11-09 20:00 → 2026-11-10 01:07 (`3.18V`) | Successful sends aren't logged; confirm from Telegram |
 

@@ -56,7 +56,8 @@ class Bot(private val control: Control, private val usersFile: File) {
         fun setAlerts(on: Boolean)
         fun setVideos(on: Boolean)
         fun last(chatId: Long)
-        fun sshd()
+        /** [minutes] = keep SSH on that long; null = off now. */
+        fun sshd(minutes: Int?)
         fun reload()
         fun testKill()
         fun testStop()
@@ -83,7 +84,7 @@ class Bot(private val control: Control, private val usersFile: File) {
             "/videos on|off – also send the motion video\n" +
             "/last – send the most recent saved clip\n" +
             "/log – last 30 log lines\n" +
-            "/sshd – start SSH on the phone (Termux)\n" +
+            "/sshd on [min] | off – SSH on the phone for N minutes (default 30, max 120), then off by itself\n" +
             "/summary – counts since the last daily summary, storage\n" +
             "/reload – re-read settings\n" +
             "/allow ID, /revoke ID, /users – roommates\n" +
@@ -442,7 +443,7 @@ class Bot(private val control: Control, private val usersFile: File) {
             "/videos" -> onOff(arg)?.let { control.setVideos(it); reply("Motion videos: ${if (it) "ON" else "OFF"}") }
                 ?: reply("Usage: /videos on   or   /videos off")
             "/last" -> control.last(chatId)
-            "/sshd" -> control.sshd()
+            "/sshd" -> control.sshd(Commands.sshdMinutes(arg, cmd.rest))
             "/testkill" -> { reply("Killing the app now. Expect a 'back online' message."); control.testKill() }
             "/teststop" -> { reply("Stopping the service. The 1-minute check should restart it."); control.testStop() }
             "/testtemp" -> {

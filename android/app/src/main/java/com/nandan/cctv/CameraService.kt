@@ -687,6 +687,7 @@ class CameraService : Service(), Bot.Control {
     private fun checkBattery() {
         cpuTempC()?.let { daily.noteTemp(it) } // the real reading, not a /testtemp fake
         sendDailySummaryIfDue() // neither needs the battery reading below
+        sshdAutoOff()
         val b = BatteryInfo.read(this) ?: return
         val now = SystemClock.elapsedRealtime()
         var tempC = b.tempC
@@ -804,11 +805,13 @@ class CameraService : Service(), Bot.Control {
      * first service start after each boot asks Termux to do it. "Boot time" = now minus
      * time since boot; it identifies the boot (allowing a minute of clock jitter).
      */
+    /** Only with sshdAtBoot (development); otherwise SSH stays closed until /sshd on. */
     private fun startSshdOncePerBoot() {
+        if (!config.sshdAtBoot) return
         val bootMin = (System.currentTimeMillis() - SystemClock.elapsedRealtime()) / 60_000
         val last = prefs().getLong("sshdBootMin", 0)
         if (Math.abs(bootMin - last) > 1) {
-            if (Termux.startSshd(this, "first start since boot")) prefs().edit().putLong("sshdBootMin", bootMin).apply()
+            if (Termux.run(this, Termux.START_SSHD, "first start since boot")) prefs().edit().putLong("sshdBootMin", bootMin).apply()
         }
     }
 
@@ -822,9 +825,27 @@ class CameraService : Service(), Bot.Control {
     }
     override fun setRecording(on: Boolean) { recordOn = on; prefs().edit().putBoolean("record", on).apply() }
     override fun setAlerts(on: Boolean) { alertsOn = on; prefs().edit().putBoolean("alerts", on).apply() }
-    override fun sshd() {
-        val ok = Termux.startSshd(this, "/sshd command")
-        bot.send(if (ok) "Asked Termux to start sshd. Try ssh in ~10 s." else "Could not reach Termux, see /log")
+    override fun sshd(minutes: Int?) {
+        if (minutes == null) {
+            prefs().edit().remove("sshdUntil").apply()
+            val ok = Termux.run(this, Termux.STOP_SSHD, "/sshd off")
+            bot.send(if (ok) "SSH off (sessions already open keep running)." else "Could not reach Termux, see /log")
+            return
+        }
+        val until = System.currentTimeMillis() + minutes * 60_000L
+        prefs().edit().putLong("sshdUntil", until).apply()
+        val ok = Termux.run(this, Termux.START_SSHD, "/sshd on $minutes")
+        bot.send(if (ok) "SSH on for $minutes min (until ${SimpleDateFormat("HH:mm", Locale.US).format(Date(until))}). Try ssh in ~10 s."
+            else "Could not reach Termux, see /log")
+    }
+
+    /** Every minute (battery watcher): past the /sshd on deadline → stop sshd. Kept in prefs, so it survives restarts. */
+    private fun sshdAutoOff() {
+        val until = prefs().getLong("sshdUntil", 0)
+        if (until > 0 && System.currentTimeMillis() >= until) {
+            prefs().edit().remove("sshdUntil").apply()
+            Termux.run(this, Termux.STOP_SSHD, "auto-off")
+        }
     }
 
     override fun setVideos(on: Boolean) { videosOn = on; prefs().edit().putBoolean("videos", on).apply() }
